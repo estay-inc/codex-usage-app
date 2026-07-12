@@ -181,6 +181,11 @@ private enum ApplicationRelocator {
 }
 
 private struct LimitWindow {
+    private enum Kind {
+        case fiveHour
+        case weekly
+    }
+
     let usedPercent: Int
     let resetsAt: Date?
     let durationMinutes: Int?
@@ -197,11 +202,24 @@ private struct LimitWindow {
     }
 
     var remainingPercent: Int { max(0, min(100, 100 - usedPercent)) }
+
+    fileprivate var isFiveHour: Bool {
+        kind == .fiveHour
+    }
+
+    fileprivate var isWeekly: Bool {
+        kind == .weekly
+    }
+
+    private var kind: Kind? {
+        guard let durationMinutes else { return nil }
+        return durationMinutes < 1_440 ? .fiveHour : .weekly
+    }
 }
 
 private struct UsageSnapshot {
-    let primary: LimitWindow?
-    let secondary: LimitWindow?
+    let fiveHour: LimitWindow?
+    let weekly: LimitWindow?
     let planType: String?
     let updatedAt: Date
 
@@ -209,8 +227,14 @@ private struct UsageSnapshot {
         guard let rateLimits = result["rateLimits"] as? [String: Any] else {
             throw AppError.invalidResponse
         }
-        primary = LimitWindow(json: rateLimits["primary"] as? [String: Any])
-        secondary = LimitWindow(json: rateLimits["secondary"] as? [String: Any])
+        let rawPrimary = LimitWindow(json: rateLimits["primary"] as? [String: Any])
+        let rawSecondary = LimitWindow(json: rateLimits["secondary"] as? [String: Any])
+        let windows = [rawPrimary, rawSecondary].compactMap { $0 }
+
+        fiveHour = windows.first(where: \.isFiveHour)
+            ?? (rawPrimary?.durationMinutes == nil ? rawPrimary : nil)
+        weekly = windows.first(where: \.isWeekly)
+            ?? (rawSecondary?.durationMinutes == nil ? rawSecondary : nil)
         planType = rateLimits["planType"] as? String
         updatedAt = Date()
     }
@@ -299,7 +323,7 @@ private final class CodexAppServerClient {
                     "clientInfo": [
                         "name": "codex-usage-app",
                         "title": "Codex Usage App",
-                        "version": "1.3.0"
+                        "version": "1.3.1"
                     ]
                 ]
             ) { result in
@@ -481,9 +505,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             statusItem.button?.title = "Codex —"
             return
         }
-        let primary = snapshot.primary.map { "5h \($0.remainingPercent)%" } ?? "5h —"
-        let secondary = snapshot.secondary.map { "W \($0.remainingPercent)%" } ?? "W —"
-        statusItem.button?.title = "\(primary)  \(secondary)"
+        let fiveHour = snapshot.fiveHour.map { "5h \($0.remainingPercent)%" } ?? "5h —"
+        let weekly = snapshot.weekly.map { "W \($0.remainingPercent)%" } ?? "W —"
+        statusItem.button?.title = "\(fiveHour)  \(weekly)"
     }
 
     private func rebuildMenu() {
@@ -499,13 +523,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if let snapshot {
             addWindow(
-                snapshot.primary,
+                snapshot.fiveHour,
                 fallbackName: L10n.string("window.five_hour", fallback: "5-hour limit"),
                 to: menu
             )
             menu.addItem(.separator())
             addWindow(
-                snapshot.secondary,
+                snapshot.weekly,
                 fallbackName: L10n.string("window.weekly", fallback: "Weekly limit"),
                 to: menu
             )
@@ -736,9 +760,9 @@ private enum CodexUsageMenuBarApp {
             client.fetchUsage { result in
                 switch result {
                 case .success(let snapshot):
-                    let primary = snapshot.primary?.remainingPercent.description ?? "—"
-                    let secondary = snapshot.secondary?.remainingPercent.description ?? "—"
-                    print("OK 5h_remaining=\(primary)% weekly_remaining=\(secondary)%")
+                    let fiveHour = snapshot.fiveHour?.remainingPercent.description ?? "—"
+                    let weekly = snapshot.weekly?.remainingPercent.description ?? "—"
+                    print("OK 5h_remaining=\(fiveHour)% weekly_remaining=\(weekly)%")
                     exitCode = 0
                 case .failure(let error):
                     fputs("ERROR \(error.localizedDescription)\n", stderr)
@@ -748,6 +772,43 @@ private enum CodexUsageMenuBarApp {
             _ = semaphore.wait(timeout: .now() + 20)
             client.stop()
             Foundation.exit(exitCode)
+        }
+
+        if CommandLine.arguments.contains("--rate-limit-parser-test") {
+            do {
+                let weeklyOnly = try UsageSnapshot(result: [
+                    "rateLimits": [
+                        "primary": [
+                            "usedPercent": 32,
+                            "windowDurationMins": 10_080
+                        ],
+                        "secondary": NSNull()
+                    ]
+                ])
+                let bothWindows = try UsageSnapshot(result: [
+                    "rateLimits": [
+                        "primary": [
+                            "usedPercent": 5,
+                            "windowDurationMins": 300
+                        ],
+                        "secondary": [
+                            "usedPercent": 31,
+                            "windowDurationMins": 10_080
+                        ]
+                    ]
+                ])
+                guard weeklyOnly.fiveHour == nil,
+                      weeklyOnly.weekly?.remainingPercent == 68,
+                      bothWindows.fiveHour?.remainingPercent == 95,
+                      bothWindows.weekly?.remainingPercent == 69 else {
+                    throw AppError.invalidResponse
+                }
+                print("OK rate-limit-window-classification")
+                Foundation.exit(0)
+            } catch {
+                fputs("ERROR \(error.localizedDescription)\n", stderr)
+                Foundation.exit(1)
+            }
         }
 
         let app = NSApplication.shared

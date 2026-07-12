@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.3.1 - 2026-07-13
+
+- Classify 5-hour and weekly limits by their window duration instead of their
+  position in the App Server response.
+- Show a weekly-only response under `W` when the current plan does not return a
+  separate 5-hour window.
+
 ## 1.3.0 - 2026-07-13
 
 - Add native English and Japanese localization resources.
