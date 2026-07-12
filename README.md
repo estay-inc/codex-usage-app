@@ -27,6 +27,17 @@ Codex 5-hour and weekly usage limits.
   macOS language setting.
 - Keeps usage data local; there is no analytics or developer-operated backend.
 
+## In the menu bar
+
+<p align="center">
+  <img src="docs/images/menu-bar-status.png" width="236" alt="Codex Usage App showing 5h 70% and W 69% in the macOS menu bar">
+</p>
+
+- `5h 70%` means 70% remains in the current 5-hour usage window.
+- `W 69%` means 69% remains in the weekly usage window.
+- Click the status item to see used percentages, reset times, your plan, and
+  the last update time.
+
 ## Requirements
 
 - macOS 13 or later.
