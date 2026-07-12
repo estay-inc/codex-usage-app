@@ -22,6 +22,127 @@ private enum AppError: LocalizedError {
     }
 }
 
+private enum ApplicationRelocator {
+    private static let appName = "Codex Usage.app"
+
+    static var destinationDirectory: URL {
+        if let overridePath = ProcessInfo.processInfo.environment["CODEX_USAGE_APPLICATIONS_DIR"] {
+            return URL(fileURLWithPath: overridePath, isDirectory: true)
+        }
+        return URL(fileURLWithPath: "/Applications", isDirectory: true)
+    }
+
+    static var destinationURL: URL {
+        destinationDirectory.appendingPathComponent(appName, isDirectory: true)
+    }
+
+    static func isRunningFromApplications() -> Bool {
+        let parent = Bundle.main.bundleURL
+            .deletingLastPathComponent()
+            .resolvingSymlinksInPath()
+            .standardizedFileURL
+        let systemApplications = URL(fileURLWithPath: "/Applications", isDirectory: true)
+            .resolvingSymlinksInPath()
+            .standardizedFileURL
+        let userApplications = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+            .appendingPathComponent("Applications", isDirectory: true)
+            .resolvingSymlinksInPath()
+            .standardizedFileURL
+        return parent == systemApplications || parent == userApplications
+    }
+
+    static func offerMoveAndRelaunch() -> Bool {
+        guard Bundle.main.bundleURL.pathExtension == "app",
+              !isRunningFromApplications() else { return false }
+
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Applicationsフォルダへ移動しますか？"
+        let replacement = FileManager.default.fileExists(atPath: destinationURL.path)
+            ? "既存のCodex Usageを置き換え、"
+            : ""
+        alert.informativeText = "\(replacement)Codex UsageをApplicationsフォルダへ移動して開きます。"
+        alert.addButton(withTitle: "移動して開く")
+        alert.addButton(withTitle: "このまま開く")
+
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            NSApp.setActivationPolicy(.accessory)
+            return false
+        }
+
+        do {
+            let installedURL = try install(to: destinationDirectory)
+            try launch(installedURL)
+            return true
+        } catch {
+            let failure = NSAlert()
+            failure.alertStyle = .warning
+            failure.messageText = "Applicationsフォルダへ移動できませんでした"
+            failure.informativeText = "この場所から起動を続けます。\n\n\(error.localizedDescription)"
+            failure.addButton(withTitle: "OK")
+            failure.runModal()
+            NSApp.setActivationPolicy(.accessory)
+            return false
+        }
+    }
+
+    @discardableResult
+    static func install(to directory: URL) throws -> URL {
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let source = Bundle.main.bundleURL
+        let destination = directory.appendingPathComponent(appName, isDirectory: true)
+        let identifier = UUID().uuidString
+        let staging = directory.appendingPathComponent(".Codex Usage.installing-\(identifier).app", isDirectory: true)
+        let backup = directory.appendingPathComponent(".Codex Usage.backup-\(identifier).app", isDirectory: true)
+
+        defer {
+            try? fileManager.removeItem(at: staging)
+            try? fileManager.removeItem(at: backup)
+        }
+
+        try fileManager.copyItem(at: source, to: staging)
+
+        let hasExistingApp = fileManager.fileExists(atPath: destination.path)
+        if hasExistingApp {
+            try fileManager.moveItem(at: destination, to: backup)
+        }
+
+        do {
+            try fileManager.moveItem(at: staging, to: destination)
+        } catch {
+            if hasExistingApp, fileManager.fileExists(atPath: backup.path) {
+                try? fileManager.moveItem(at: backup, to: destination)
+            }
+            throw error
+        }
+
+        if hasExistingApp {
+            try? fileManager.removeItem(at: backup)
+        }
+        return destination
+    }
+
+    private static func launch(_ applicationURL: URL) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = ["-n", applicationURL.path]
+        try process.run()
+        process.waitUntilExit()
+        if process.terminationStatus != 0 {
+            throw NSError(
+                domain: "jp.codex.usage-menubar.install",
+                code: Int(process.terminationStatus),
+                userInfo: [NSLocalizedDescriptionKey: "インストール後のアプリを開けませんでした。"]
+            )
+        }
+    }
+}
+
 private struct LimitWindow {
     let usedPercent: Int
     let resetsAt: Date?
@@ -141,7 +262,7 @@ private final class CodexAppServerClient {
                     "clientInfo": [
                         "name": "codex-usage-menubar",
                         "title": "Codex Usage Menu Bar",
-                        "version": "1.0.0"
+                        "version": "1.1.0"
                     ]
                 ]
             ) { result in
@@ -276,6 +397,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var isRefreshing = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if ApplicationRelocator.offerMoveAndRelaunch() {
+            NSApp.terminate(nil)
+            return
+        }
         NSApp.setActivationPolicy(.accessory)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.image = NSImage(systemSymbolName: "chart.bar.fill", accessibilityDescription: "Codex Usage")
@@ -465,6 +590,22 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 private enum CodexUsageMenuBarApp {
     static func main() {
+        if let testIndex = CommandLine.arguments.firstIndex(of: "--self-install-test"),
+           CommandLine.arguments.indices.contains(testIndex + 1) {
+            let destination = URL(
+                fileURLWithPath: CommandLine.arguments[testIndex + 1],
+                isDirectory: true
+            )
+            do {
+                let installedURL = try ApplicationRelocator.install(to: destination)
+                print("OK installed=\(installedURL.path)")
+                Foundation.exit(0)
+            } catch {
+                fputs("ERROR \(error.localizedDescription)\n", stderr)
+                Foundation.exit(1)
+            }
+        }
+
         if CommandLine.arguments.contains("--self-test") {
             let client = CodexAppServerClient()
             let semaphore = DispatchSemaphore(value: 0)

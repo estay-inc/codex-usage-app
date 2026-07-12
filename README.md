@@ -31,11 +31,12 @@ stores your ChatGPT tokens itself.
 
 ## Install a release
 
-1. Download `Codex Usage.zip` from the repository's Releases page.
-2. Unzip it and move `Codex Usage.app` to `/Applications`.
-3. Open the app. If macOS blocks an unsigned community build, Control-click the
-   app in Finder and choose **Open**.
-4. Optionally enable **Launch at Login** from the menu.
+1. Download `Codex Usage.dmg` from the repository's Releases page.
+2. Open the DMG, then open `Codex Usage.app`.
+3. Click **Move and Open** when the app asks to move itself to `/Applications`.
+4. If macOS blocks an unsigned community build, Control-click the app in Finder
+   and choose **Open** once.
+5. Optionally enable **Launch at Login** from the menu.
 
 Community release builds are ad-hoc signed, not Apple-notarized.
 
@@ -55,6 +56,12 @@ Create a universal binary and ZIP package:
 
 ```bash
 ARCHS=universal PACKAGE=1 ./scripts/build.sh
+```
+
+Create the DMG used for GitHub Releases:
+
+```bash
+ARCHS=universal DMG=1 ./scripts/build.sh
 ```
 
 Run the live usage test on a Mac already signed in to Codex:

@@ -53,4 +53,8 @@ if [[ "${PACKAGE:-0}" == "1" ]]; then
   echo "Created $BUILD_DIR/Codex Usage.zip"
 fi
 
+if [[ "${DMG:-0}" == "1" ]]; then
+  "$ROOT_DIR/scripts/package-dmg.sh"
+fi
+
 echo "Built $APP_DIR"
