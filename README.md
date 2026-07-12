@@ -9,6 +9,10 @@ Codex 5-hour and weekly usage limits.
 
 [日本語 README](README.ja.md)
 
+<p align="center">
+  <a href="https://github.com/estay-inc/codex-usage-app/releases/latest/download/Codex-Usage-App.dmg"><strong>Download for macOS (.dmg)</strong></a>
+</p>
+
 ![macOS](https://img.shields.io/badge/macOS-13%2B-black)
 ![Swift](https://img.shields.io/badge/Swift-6-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
@@ -35,7 +39,7 @@ stores your ChatGPT tokens itself.
 
 ## Install a release
 
-1. Download `Codex-Usage-App.dmg` from the repository's Releases page.
+1. Download and open [Codex-Usage-App.dmg](https://github.com/estay-inc/codex-usage-app/releases/latest/download/Codex-Usage-App.dmg).
 2. Open the DMG, then open `Codex Usage.app`.
 3. Click **Move and Open** when the app asks to move itself to `/Applications`.
 4. If macOS blocks an unsigned community build, Control-click the app in Finder
