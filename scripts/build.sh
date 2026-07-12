@@ -46,6 +46,9 @@ fi
 
 cp "$PLIST" "$APP_DIR/Contents/Info.plist"
 cp "$ICON" "$APP_DIR/Contents/Resources/AppIcon.icns"
+for localization in "$ROOT_DIR"/Resources/*.lproj; do
+  cp -R "$localization" "$APP_DIR/Contents/Resources/"
+done
 codesign --force --deep --sign - "$APP_DIR"
 plutil -lint "$APP_DIR/Contents/Info.plist"
 codesign --verify --deep --strict "$APP_DIR"

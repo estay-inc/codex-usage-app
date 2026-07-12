@@ -23,6 +23,8 @@ Codex 5-hour and weekly usage limits.
 - Displays used percentage, reset time, plan, and last update time.
 - Refreshes automatically every two minutes.
 - Supports launching at login through macOS `SMAppService`.
+- Switches the app UI automatically between English and Japanese based on the
+  macOS language setting.
 - Keeps usage data local; there is no analytics or developer-operated backend.
 
 ## Requirements

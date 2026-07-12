@@ -2,6 +2,16 @@ import AppKit
 import Foundation
 import ServiceManagement
 
+private enum L10n {
+    static func string(_ key: String, fallback: String) -> String {
+        Bundle.main.localizedString(forKey: key, value: fallback, table: nil)
+    }
+
+    static func format(_ key: String, fallback: String, _ arguments: CVarArg...) -> String {
+        String(format: string(key, fallback: fallback), arguments: arguments)
+    }
+}
+
 private enum AppError: LocalizedError {
     case codexNotFound
     case serverStopped
@@ -11,11 +21,20 @@ private enum AppError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .codexNotFound:
-            return "Codex CLIが見つかりません。ChatGPT/Codexアプリをインストールしてください。"
+            return L10n.string(
+                "error.codex_not_found",
+                fallback: "Codex CLI was not found. Install the ChatGPT or Codex app."
+            )
         case .serverStopped:
-            return "Codex App Serverとの接続が終了しました。"
+            return L10n.string(
+                "error.server_stopped",
+                fallback: "The connection to Codex App Server ended."
+            )
         case .invalidResponse:
-            return "Codexから不正な応答を受け取りました。"
+            return L10n.string(
+                "error.invalid_response",
+                fallback: "Codex returned an invalid response."
+            )
         case .server(let message):
             return message
         }
@@ -60,13 +79,19 @@ private enum ApplicationRelocator {
 
         let alert = NSAlert()
         alert.alertStyle = .informational
-        alert.messageText = "Applicationsフォルダへ移動しますか？"
-        let replacement = FileManager.default.fileExists(atPath: destinationURL.path)
-            ? "既存のCodex Usageを置き換え、"
-            : ""
-        alert.informativeText = "\(replacement)Codex UsageをApplicationsフォルダへ移動して開きます。"
-        alert.addButton(withTitle: "移動して開く")
-        alert.addButton(withTitle: "このまま開く")
+        alert.messageText = L10n.string(
+            "installer.move_title",
+            fallback: "Move to the Applications folder?"
+        )
+        let messageKey = FileManager.default.fileExists(atPath: destinationURL.path)
+            ? "installer.replace_message"
+            : "installer.move_message"
+        let messageFallback = FileManager.default.fileExists(atPath: destinationURL.path)
+            ? "Replace the existing Codex Usage app, move this copy to Applications, and open it."
+            : "Move Codex Usage to the Applications folder and open it."
+        alert.informativeText = L10n.string(messageKey, fallback: messageFallback)
+        alert.addButton(withTitle: L10n.string("installer.move_and_open", fallback: "Move and Open"))
+        alert.addButton(withTitle: L10n.string("installer.open_here", fallback: "Open Here"))
 
         guard alert.runModal() == .alertFirstButtonReturn else {
             NSApp.setActivationPolicy(.accessory)
@@ -80,9 +105,16 @@ private enum ApplicationRelocator {
         } catch {
             let failure = NSAlert()
             failure.alertStyle = .warning
-            failure.messageText = "Applicationsフォルダへ移動できませんでした"
-            failure.informativeText = "この場所から起動を続けます。\n\n\(error.localizedDescription)"
-            failure.addButton(withTitle: "OK")
+            failure.messageText = L10n.string(
+                "installer.failure_title",
+                fallback: "Could not move the app to Applications"
+            )
+            failure.informativeText = L10n.format(
+                "installer.failure_message",
+                fallback: "The app will continue running from this location.\n\n%@",
+                error.localizedDescription
+            )
+            failure.addButton(withTitle: L10n.string("button.ok", fallback: "OK"))
             failure.runModal()
             NSApp.setActivationPolicy(.accessory)
             return false
@@ -137,7 +169,12 @@ private enum ApplicationRelocator {
             throw NSError(
                 domain: "jp.codex.usage-menubar.install",
                 code: Int(process.terminationStatus),
-                userInfo: [NSLocalizedDescriptionKey: "インストール後のアプリを開けませんでした。"]
+                userInfo: [
+                    NSLocalizedDescriptionKey: L10n.string(
+                        "installer.launch_failed",
+                        fallback: "The installed app could not be opened."
+                    )
+                ]
             )
         }
     }
@@ -262,7 +299,7 @@ private final class CodexAppServerClient {
                     "clientInfo": [
                         "name": "codex-usage-app",
                         "title": "Codex Usage App",
-                        "version": "1.2.0"
+                        "version": "1.3.0"
                     ]
                 ]
             ) { result in
@@ -338,7 +375,8 @@ private final class CodexAppServerClient {
                   let callback = callbacks.removeValue(forKey: id) else { continue }
 
             if let errorObject = object["error"] as? [String: Any] {
-                let message = errorObject["message"] as? String ?? "Codex App Serverエラー"
+                let message = errorObject["message"] as? String
+                    ?? L10n.string("error.server", fallback: "Codex App Server error")
                 callback(.failure(AppError.server(message)))
             } else if let result = object["result"] as? [String: Any] {
                 callback(.success(result))
@@ -450,50 +488,97 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func rebuildMenu() {
         let menu = NSMenu()
-        let title = NSMenuItem(title: "Codex Usage App", action: nil, keyEquivalent: "")
+        let title = NSMenuItem(
+            title: L10n.string("menu.title", fallback: "Codex Usage App"),
+            action: nil,
+            keyEquivalent: ""
+        )
         title.isEnabled = false
         menu.addItem(title)
         menu.addItem(.separator())
 
         if let snapshot {
-            addWindow(snapshot.primary, fallbackName: "5時間枠", to: menu)
+            addWindow(
+                snapshot.primary,
+                fallbackName: L10n.string("window.five_hour", fallback: "5-hour limit"),
+                to: menu
+            )
             menu.addItem(.separator())
-            addWindow(snapshot.secondary, fallbackName: "週次枠", to: menu)
+            addWindow(
+                snapshot.secondary,
+                fallbackName: L10n.string("window.weekly", fallback: "Weekly limit"),
+                to: menu
+            )
             menu.addItem(.separator())
             if let plan = snapshot.planType {
-                addDisabled("プラン: \(formatPlan(plan))", to: menu)
+                addDisabled(
+                    L10n.format("menu.plan", fallback: "Plan: %@", formatPlan(plan)),
+                    to: menu
+                )
             }
-            addDisabled("最終更新: \(timeFormatter.string(from: snapshot.updatedAt))", to: menu)
+            addDisabled(
+                L10n.format(
+                    "menu.last_updated",
+                    fallback: "Last updated: %@",
+                    timeFormatter.string(from: snapshot.updatedAt)
+                ),
+                to: menu
+            )
         } else {
-            addDisabled(isRefreshing ? "Usageを取得中…" : "Usageを取得できません", to: menu)
+            addDisabled(
+                isRefreshing
+                    ? L10n.string("menu.fetching", fallback: "Fetching usage…")
+                    : L10n.string("menu.unavailable", fallback: "Usage unavailable"),
+                to: menu
+            )
         }
 
         if let errorMessage {
             menu.addItem(.separator())
-            let errorItem = NSMenuItem(title: "エラー: \(errorMessage)", action: nil, keyEquivalent: "")
+            let errorItem = NSMenuItem(
+                title: L10n.format("menu.error", fallback: "Error: %@", errorMessage),
+                action: nil,
+                keyEquivalent: ""
+            )
             errorItem.isEnabled = false
             menu.addItem(errorItem)
         }
 
         menu.addItem(.separator())
-        let refreshItem = NSMenuItem(title: "今すぐ更新", action: #selector(refresh), keyEquivalent: "r")
+        let refreshItem = NSMenuItem(
+            title: L10n.string("menu.refresh", fallback: "Refresh Now"),
+            action: #selector(refresh),
+            keyEquivalent: "r"
+        )
         refreshItem.target = self
         refreshItem.isEnabled = !isRefreshing
         menu.addItem(refreshItem)
 
         if #available(macOS 13.0, *) {
-            let launchItem = NSMenuItem(title: "ログイン時に起動", action: #selector(toggleLaunchAtLogin(_:)), keyEquivalent: "")
+            let launchItem = NSMenuItem(
+                title: L10n.string("menu.launch_at_login", fallback: "Launch at Login"),
+                action: #selector(toggleLaunchAtLogin(_:)),
+                keyEquivalent: ""
+            )
             launchItem.target = self
             launchItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
             menu.addItem(launchItem)
         }
 
-        let openItem = NSMenuItem(title: "ChatGPTを開く", action: #selector(openChatGPT), keyEquivalent: "")
+        let openItem = NSMenuItem(
+            title: L10n.string("menu.open_chatgpt", fallback: "Open ChatGPT"),
+            action: #selector(openChatGPT),
+            keyEquivalent: ""
+        )
         openItem.target = self
         menu.addItem(openItem)
         menu.addItem(.separator())
 
-        let quitItem = NSMenuItem(title: "終了", action: #selector(quit), keyEquivalent: "q")
+        let quitItem = NSMenuItem(
+            title: L10n.string("menu.quit", fallback: "Quit"),
+            action: #selector(quit),
+            keyEquivalent: "q"
+        )
         quitItem.target = self
         menu.addItem(quitItem)
         statusItem.menu = menu
@@ -506,15 +591,32 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let name: String
         if let minutes = window.durationMinutes, minutes == 300 {
-            name = "5時間枠"
+            name = L10n.string("window.five_hour", fallback: "5-hour limit")
         } else if let minutes = window.durationMinutes, minutes == 10_080 {
-            name = "週次枠"
+            name = L10n.string("window.weekly", fallback: "Weekly limit")
         } else {
             name = fallbackName
         }
-        addDisabled("\(name): 残り \(window.remainingPercent)%（使用 \(window.usedPercent)%）", to: menu)
+        addDisabled(
+            L10n.format(
+                "window.usage",
+                fallback: "%@: Remaining %d%% (Used %d%%)",
+                name,
+                window.remainingPercent,
+                window.usedPercent
+            ),
+            to: menu
+        )
         if let reset = window.resetsAt {
-            addDisabled("リセット: \(resetFormatter.string(from: reset))", indent: 1, to: menu)
+            addDisabled(
+                L10n.format(
+                    "window.reset",
+                    fallback: "Reset: %@",
+                    resetFormatter.string(from: reset)
+                ),
+                indent: 1,
+                to: menu
+            )
         }
     }
 
@@ -545,7 +647,17 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             rebuildMenu()
         } catch {
-            showAlert(title: "自動起動を変更できません", message: "アプリをApplicationsフォルダへ移動してから、もう一度お試しください。\n\n\(error.localizedDescription)")
+            showAlert(
+                title: L10n.string(
+                    "autostart.error_title",
+                    fallback: "Could not change Launch at Login"
+                ),
+                message: L10n.format(
+                    "autostart.error_message",
+                    fallback: "Move the app to the Applications folder, then try again.\n\n%@",
+                    error.localizedDescription
+                )
+            )
         }
     }
 
@@ -561,7 +673,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.messageText = title
         alert.informativeText = message
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: L10n.string("button.ok", fallback: "OK"))
         alert.runModal()
         NSApp.setActivationPolicy(.accessory)
     }
@@ -572,15 +684,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private lazy var timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ja_JP")
-        formatter.dateFormat = "HH:mm"
+        formatter.locale = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("HHmm")
         return formatter
     }()
 
     private lazy var resetFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ja_JP")
-        formatter.dateFormat = "M月d日 HH:mm"
+        formatter.locale = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("MdHHmm")
         return formatter
     }()
 }
@@ -588,6 +700,19 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 private enum CodexUsageMenuBarApp {
     static func main() {
+        if CommandLine.arguments.contains("--localization-test") {
+            print(
+                "move_title="
+                    + L10n.string(
+                        "installer.move_title",
+                        fallback: "Move to the Applications folder?"
+                    )
+            )
+            print("refresh=" + L10n.string("menu.refresh", fallback: "Refresh Now"))
+            print("quit=" + L10n.string("menu.quit", fallback: "Quit"))
+            Foundation.exit(0)
+        }
+
         if let testIndex = CommandLine.arguments.firstIndex(of: "--self-install-test"),
            CommandLine.arguments.indices.contains(testIndex + 1) {
             let destination = URL(

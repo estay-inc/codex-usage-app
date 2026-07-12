@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.3.0 - 2026-07-13
+
+- Add native English and Japanese localization resources.
+- Follow the macOS app language setting automatically.
+- Localize the installation flow, menu items, status details, dates, and errors.
+- Add automated localization validation for both languages.
+
 ## 1.2.0 - 2026-07-12
 
 - Rename the open-source project to Codex Usage App.
