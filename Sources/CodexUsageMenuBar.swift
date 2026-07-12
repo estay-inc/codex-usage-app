@@ -260,9 +260,9 @@ private final class CodexAppServerClient {
                 method: "initialize",
                 params: [
                     "clientInfo": [
-                        "name": "codex-usage-menubar",
-                        "title": "Codex Usage Menu Bar",
-                        "version": "1.1.0"
+                        "name": "codex-usage-app",
+                        "title": "Codex Usage App",
+                        "version": "1.2.0"
                     ]
                 ]
             ) { result in
@@ -403,8 +403,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NSApp.setActivationPolicy(.accessory)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "chart.bar.fill", accessibilityDescription: "Codex Usage")
-        statusItem.button?.imagePosition = .imageLeading
         statusItem.button?.title = "Codex …"
         rebuildMenu()
         refresh()
@@ -452,7 +450,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func rebuildMenu() {
         let menu = NSMenu()
-        let title = NSMenuItem(title: "Codex Usage", action: nil, keyEquivalent: "")
+        let title = NSMenuItem(title: "Codex Usage App", action: nil, keyEquivalent: "")
         title.isEnabled = false
         menu.addItem(title)
         menu.addItem(.separator())

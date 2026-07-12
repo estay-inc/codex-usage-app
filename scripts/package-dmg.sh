@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${BUILD_DIR:-$ROOT_DIR/build}"
 APP_DIR="$BUILD_DIR/Codex Usage.app"
-DMG_PATH="$BUILD_DIR/Codex Usage.dmg"
+DMG_PATH="$BUILD_DIR/Codex Usage App.dmg"
 
 if [[ ! -d "$APP_DIR" ]]; then
   ARCHS=universal "$ROOT_DIR/scripts/build.sh"
@@ -17,7 +17,7 @@ ditto "$APP_DIR" "$staging_dir/Codex Usage.app"
 ln -s /Applications "$staging_dir/Applications"
 
 hdiutil create \
-  -volname "Codex Usage" \
+  -volname "Codex Usage App" \
   -srcfolder "$staging_dir" \
   -ov \
   -format UDZO \

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.2.0 - 2026-07-12
+
+- Rename the open-source project to Codex Usage App.
+- Add a minimal monochrome app icon representing the 5-hour and weekly limits.
+- Remove the decorative chart icon from the menu bar and show usage values only.
+- Publish the project through the ESTAY GitHub organization.
+
 ## 1.1.0 - 2026-07-12
 
 - Add a DMG package containing the app and an Applications shortcut.

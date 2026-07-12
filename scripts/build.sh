@@ -7,6 +7,7 @@ APP_NAME="Codex Usage.app"
 APP_DIR="$BUILD_DIR/$APP_NAME"
 SOURCE="$ROOT_DIR/Sources/CodexUsageMenuBar.swift"
 PLIST="$ROOT_DIR/Resources/Info.plist"
+ICON="$ROOT_DIR/Resources/AppIcon.icns"
 MIN_MACOS="${MIN_MACOS:-13.0}"
 ARCHS="${ARCHS:-native}"
 
@@ -44,13 +45,14 @@ else
 fi
 
 cp "$PLIST" "$APP_DIR/Contents/Info.plist"
+cp "$ICON" "$APP_DIR/Contents/Resources/AppIcon.icns"
 codesign --force --deep --sign - "$APP_DIR"
 plutil -lint "$APP_DIR/Contents/Info.plist"
 codesign --verify --deep --strict "$APP_DIR"
 
 if [[ "${PACKAGE:-0}" == "1" ]]; then
-  ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$BUILD_DIR/Codex Usage.zip"
-  echo "Created $BUILD_DIR/Codex Usage.zip"
+  ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$BUILD_DIR/Codex Usage App.zip"
+  echo "Created $BUILD_DIR/Codex Usage App.zip"
 fi
 
 if [[ "${DMG:-0}" == "1" ]]; then

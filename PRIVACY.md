@@ -1,6 +1,6 @@
 # Privacy
 
-Codex Usage Menu Bar does not operate a backend service and does not include
+Codex Usage App does not operate a backend service and does not include
 analytics, advertising, crash-reporting SDKs, or telemetry controlled by this
 project.
 

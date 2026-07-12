@@ -1,4 +1,8 @@
-# Codex Usage Menu Bar
+# Codex Usage App
+
+<p align="center">
+  <img src="Resources/AppIcon.svg" width="128" alt="Codex Usage App icon">
+</p>
 
 An unofficial, open-source macOS menu bar utility that shows the remaining
 Codex 5-hour and weekly usage limits.
@@ -31,7 +35,7 @@ stores your ChatGPT tokens itself.
 
 ## Install a release
 
-1. Download `Codex Usage.dmg` from the repository's Releases page.
+1. Download `Codex Usage App.dmg` from the repository's Releases page.
 2. Open the DMG, then open `Codex Usage.app`.
 3. Click **Move and Open** when the app asks to move itself to `/Applications`.
 4. If macOS blocks an unsigned community build, Control-click the app in Finder
@@ -46,8 +50,8 @@ Xcode is not required; the Swift toolchain included with Xcode Command Line
 Tools is sufficient.
 
 ```bash
-git clone https://github.com/estay-inc/codex-usage-menubar.git
-cd codex-usage-menubar
+git clone https://github.com/estay-inc/codex-usage-app.git
+cd codex-usage-app
 ./scripts/build.sh
 open "build/Codex Usage.app"
 ```
