@@ -35,7 +35,7 @@ stores your ChatGPT tokens itself.
 
 ## Install a release
 
-1. Download `Codex Usage App.dmg` from the repository's Releases page.
+1. Download `Codex-Usage-App.dmg` from the repository's Releases page.
 2. Open the DMG, then open `Codex Usage.app`.
 3. Click **Move and Open** when the app asks to move itself to `/Applications`.
 4. If macOS blocks an unsigned community build, Control-click the app in Finder

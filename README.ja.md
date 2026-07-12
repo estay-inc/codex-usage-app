@@ -31,7 +31,7 @@ Codexの5時間枠と週次枠の残量をmacOSのメニューバーへ表示す
 
 ## リリース版のインストール
 
-1. GitHub Releasesから`Codex Usage App.dmg`をダウンロードします。
+1. GitHub Releasesから`Codex-Usage-App.dmg`をダウンロードします。
 2. DMGを開き、その中の`Codex Usage.app`を開きます。
 3. 「Applicationsフォルダへ移動しますか？」の画面で「移動して開く」を
    クリックします。

@@ -51,8 +51,8 @@ plutil -lint "$APP_DIR/Contents/Info.plist"
 codesign --verify --deep --strict "$APP_DIR"
 
 if [[ "${PACKAGE:-0}" == "1" ]]; then
-  ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$BUILD_DIR/Codex Usage App.zip"
-  echo "Created $BUILD_DIR/Codex Usage App.zip"
+  ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$BUILD_DIR/Codex-Usage-App.zip"
+  echo "Created $BUILD_DIR/Codex-Usage-App.zip"
 fi
 
 if [[ "${DMG:-0}" == "1" ]]; then
