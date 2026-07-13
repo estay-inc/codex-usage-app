@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.3.2 - 2026-07-13
+
+- Hide the `5h` placeholder from the menu bar when the App Server does not
+  return a 5-hour limit.
+- Show only the usage windows currently available from Codex.
+
 ## 1.3.1 - 2026-07-13
 
 - Classify 5-hour and weekly limits by their window duration instead of their

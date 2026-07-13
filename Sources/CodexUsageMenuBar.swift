@@ -223,6 +223,17 @@ private struct UsageSnapshot {
     let planType: String?
     let updatedAt: Date
 
+    var statusTitle: String {
+        var components: [String] = []
+        if let fiveHour {
+            components.append("5h \(fiveHour.remainingPercent)%")
+        }
+        if let weekly {
+            components.append("W \(weekly.remainingPercent)%")
+        }
+        return components.isEmpty ? "Codex —" : components.joined(separator: "  ")
+    }
+
     init(result: [String: Any]) throws {
         guard let rateLimits = result["rateLimits"] as? [String: Any] else {
             throw AppError.invalidResponse
@@ -323,7 +334,7 @@ private final class CodexAppServerClient {
                     "clientInfo": [
                         "name": "codex-usage-app",
                         "title": "Codex Usage App",
-                        "version": "1.3.1"
+                        "version": "1.3.2"
                     ]
                 ]
             ) { result in
@@ -505,9 +516,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             statusItem.button?.title = "Codex —"
             return
         }
-        let fiveHour = snapshot.fiveHour.map { "5h \($0.remainingPercent)%" } ?? "5h —"
-        let weekly = snapshot.weekly.map { "W \($0.remainingPercent)%" } ?? "W —"
-        statusItem.button?.title = "\(fiveHour)  \(weekly)"
+        statusItem.button?.title = snapshot.statusTitle
     }
 
     private func rebuildMenu() {
@@ -762,7 +771,10 @@ private enum CodexUsageMenuBarApp {
                 case .success(let snapshot):
                     let fiveHour = snapshot.fiveHour?.remainingPercent.description ?? "—"
                     let weekly = snapshot.weekly?.remainingPercent.description ?? "—"
-                    print("OK 5h_remaining=\(fiveHour)% weekly_remaining=\(weekly)%")
+                    print(
+                        "OK status=\(snapshot.statusTitle) "
+                            + "5h_remaining=\(fiveHour)% weekly_remaining=\(weekly)%"
+                    )
                     exitCode = 0
                 case .failure(let error):
                     fputs("ERROR \(error.localizedDescription)\n", stderr)
@@ -799,8 +811,10 @@ private enum CodexUsageMenuBarApp {
                 ])
                 guard weeklyOnly.fiveHour == nil,
                       weeklyOnly.weekly?.remainingPercent == 68,
+                      weeklyOnly.statusTitle == "W 68%",
                       bothWindows.fiveHour?.remainingPercent == 95,
-                      bothWindows.weekly?.remainingPercent == 69 else {
+                      bothWindows.weekly?.remainingPercent == 69,
+                      bothWindows.statusTitle == "5h 95%  W 69%" else {
                     throw AppError.invalidResponse
                 }
                 print("OK rate-limit-window-classification")
