@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.5.0 - 2026-07-14
+
+- Show today's weekly-limit consumption as `D` alongside weekly remaining and
+  rolling one-hour consumption.
+- Keep up to 48 hours of local samples so daily usage can be calculated from
+  the Mac's local midnight.
+- Avoid showing a daily estimate when the midnight baseline or a weekly reset
+  boundary cannot be determined exactly.
+
 ## 1.4.1 - 2026-07-14
 
 - Show both the remaining weekly limit (`W`) and rolling one-hour consumption

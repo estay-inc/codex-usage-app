@@ -26,12 +26,15 @@ parser_output="$("$ROOT_DIR/build/Codex Usage.app/Contents/MacOS/CodexUsageMenuB
 history_output="$("$ROOT_DIR/build/Codex Usage.app/Contents/MacOS/CodexUsageMenuBar" --usage-history-test)"
 grep -Fq 'move_title=Move to the Applications folder?' <<<"$english_output"
 grep -Fq 'refresh=Refresh Now' <<<"$english_output"
+grep -Fq 'today_collecting=Today: Collecting data…' <<<"$english_output"
 grep -Fq 'quit=Quit' <<<"$english_output"
 grep -Fq 'move_title=Applicationsフォルダへ移動しますか？' <<<"$japanese_output"
 grep -Fq 'refresh=今すぐ更新' <<<"$japanese_output"
+grep -Fq 'today_collecting=今日: 計測中…' <<<"$japanese_output"
 grep -Fq 'quit=終了' <<<"$japanese_output"
 grep -Fq 'OK rate-limit-window-classification' <<<"$parser_output"
 grep -Fq 'OK hourly-usage-history' <<<"$history_output"
+grep -Fq 'OK daily-usage-history' <<<"$history_output"
 
 install_test_dir="$(mktemp -d "$ROOT_DIR/build/install-test.XXXXXX")"
 trap 'rm -rf "$install_test_dir"' EXIT

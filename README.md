@@ -5,8 +5,8 @@
 </p>
 
 An unofficial, open-source macOS menu bar utility that shows the remaining
-weekly Codex limit and how much was consumed during the last hour. It also
-shows the 5-hour limit when Codex returns one.
+weekly Codex limit plus consumption since local midnight and during the last
+hour. It also shows the 5-hour limit when Codex returns one.
 
 [日本語 README](README.ja.md)
 
@@ -20,15 +20,15 @@ shows the 5-hour limit when Codex returns one.
 
 ## What it does
 
-- Shows the remaining weekly limit (`W`) and rolling one-hour consumption
-  (`1h`) in the menu bar.
+- Shows the remaining weekly limit (`W`), consumption today (`D`), and rolling
+  one-hour consumption (`1h`) in the menu bar.
 - Shows the remaining 5-hour limit (`5h`) only when it is available.
 - Displays used percentage, reset time, plan, and last update time.
 - Refreshes automatically every two minutes.
 - Supports launching at login through macOS `SMAppService`.
 - Switches the app UI automatically between English and Japanese based on the
   macOS language setting.
-- Keeps two hours of usage history locally; there is no analytics or
+- Keeps up to 48 hours of usage history locally; there is no analytics or
   developer-operated backend.
 
 ## In the menu bar
@@ -38,10 +38,13 @@ shows the 5-hour limit when Codex returns one.
 </p>
 
 - `W 82%` means 82% of the weekly limit remains.
+- `D 6%` means 6% of the weekly limit was used since local midnight.
 - `1h 2%` means 2% of the weekly limit was used during the last hour.
-- The app shows `W 82%  1h …` while collecting its first hour of history.
-- When a 5-hour window is available, the title looks like
-  `5h 70%  W 82%  1h 2%`.
+- On the first day after updating, the app shows `D …` if it cannot determine
+  the midnight baseline. It also avoids estimating across a weekly reset during
+  the day. It shows `1h …` while collecting its first hour of history.
+- The normal title is `W 82%  D 6%  1h 2%`. When a 5-hour window is available,
+  it looks like `5h 70%  W 82%  D 6%  1h 2%`.
 - Click the status item to see used percentages, reset times, your plan, and
   the last update time.
 
@@ -103,8 +106,8 @@ path of the executable before launching the app.
 
 ## Privacy
 
-See [PRIVACY.md](PRIVACY.md). To calculate one-hour consumption, the app keeps
-only the last two hours of timestamps and usage percentages in macOS
+See [PRIVACY.md](PRIVACY.md). To calculate daily and one-hour consumption, the
+app keeps only the last 48 hours of timestamps and usage percentages in macOS
 `UserDefaults`. The app starts the locally installed Codex App Server, which
 communicates with OpenAI under the user's existing account and OpenAI terms.
 
