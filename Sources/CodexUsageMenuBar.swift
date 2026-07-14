@@ -217,6 +217,44 @@ private struct LimitWindow {
     }
 }
 
+private enum UsagePaceStatus: Equatable {
+    case safe
+    case atRisk
+    case unavailable
+
+    static func evaluate(
+        consumptionPercent: Int?,
+        interval: TimeInterval,
+        totalWindow: LimitWindow?,
+        at date: Date
+    ) -> UsagePaceStatus {
+        guard let consumptionPercent,
+              consumptionPercent >= 0,
+              interval > 0,
+              let totalWindow,
+              let resetsAt = totalWindow.resetsAt else {
+            return .unavailable
+        }
+
+        let remainingTime = resetsAt.timeIntervalSince(date)
+        guard remainingTime > 0 else { return .unavailable }
+
+        let projectedConsumption = Double(consumptionPercent) * remainingTime / interval
+        return projectedConsumption >= Double(totalWindow.remainingPercent) ? .atRisk : .safe
+    }
+
+    var color: NSColor? {
+        switch self {
+        case .safe:
+            return .systemGreen
+        case .atRisk:
+            return .systemRed
+        case .unavailable:
+            return nil
+        }
+    }
+}
+
 private struct UsageSnapshot {
     let fiveHour: LimitWindow?
     let weekly: LimitWindow?
@@ -248,6 +286,53 @@ private struct UsageSnapshot {
         return components.isEmpty ? "Codex —" : components.joined(separator: "  ")
     }
 
+    func statusAttributedTitle(
+        dailyUsage: DailyUsageState,
+        hourlyUsage: TrackedUsageState,
+        dailyPace: UsagePaceStatus,
+        hourlyPace: UsagePaceStatus
+    ) -> NSAttributedString {
+        let title = statusTitle(dailyUsage: dailyUsage, hourlyUsage: hourlyUsage)
+        let attributedTitle = NSMutableAttributedString(
+            string: title,
+            attributes: [
+                .font: NSFont.menuBarFont(ofSize: 0)
+            ]
+        )
+        apply(pace: dailyPace, toValueFor: "1D", in: attributedTitle)
+        apply(pace: hourlyPace, toValueFor: "1H", in: attributedTitle)
+        return attributedTitle
+    }
+
+    private func apply(
+        pace: UsagePaceStatus,
+        toValueFor label: String,
+        in attributedTitle: NSMutableAttributedString
+    ) {
+        guard let color = pace.color else { return }
+
+        let title = attributedTitle.string as NSString
+        let labelRange = title.range(of: "\(label) ")
+        guard labelRange.location != NSNotFound else { return }
+
+        let valueStart = NSMaxRange(labelRange)
+        let remainingRange = NSRange(
+            location: valueStart,
+            length: title.length - valueStart
+        )
+        let separatorRange = title.range(of: "  ", options: [], range: remainingRange)
+        let valueEnd = separatorRange.location == NSNotFound
+            ? title.length
+            : separatorRange.location
+        guard valueEnd > valueStart else { return }
+
+        attributedTitle.addAttribute(
+            .foregroundColor,
+            value: color,
+            range: NSRange(location: valueStart, length: valueEnd - valueStart)
+        )
+    }
+
     init(result: [String: Any]) throws {
         guard let rateLimits = result["rateLimits"] as? [String: Any] else {
             throw AppError.invalidResponse
@@ -269,11 +354,21 @@ private enum TrackedUsageState {
     case unavailable
     case collecting
     case usage(Int)
+
+    var percent: Int? {
+        guard case .usage(let percent) = self else { return nil }
+        return percent
+    }
 }
 
 private enum DailyUsageState {
     case unavailable
     case usage(Int, isPartial: Bool)
+
+    var percent: Int? {
+        guard case .usage(let percent, _) = self else { return nil }
+        return percent
+    }
 }
 
 private struct UsageSample: Codable {
@@ -579,7 +674,7 @@ private final class CodexAppServerClient {
                     "clientInfo": [
                         "name": "codex-usage-app",
                         "title": "Codex Usage App",
-                        "version": "1.5.3"
+                        "version": "1.6.0"
                     ]
                 ]
             ) { result in
@@ -783,9 +878,24 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             statusItem.button?.title = "Codex —"
             return
         }
-        statusItem.button?.title = snapshot.statusTitle(
+
+        let dailyPace = UsagePaceStatus.evaluate(
+            consumptionPercent: dailyUsage.percent,
+            interval: 86_400,
+            totalWindow: snapshot.weekly,
+            at: snapshot.updatedAt
+        )
+        let hourlyPace = UsagePaceStatus.evaluate(
+            consumptionPercent: hourlyUsage.percent,
+            interval: 3_600,
+            totalWindow: snapshot.weekly,
+            at: snapshot.updatedAt
+        )
+        statusItem.button?.attributedTitle = snapshot.statusAttributedTitle(
             dailyUsage: dailyUsage,
-            hourlyUsage: hourlyUsage
+            hourlyUsage: hourlyUsage,
+            dailyPace: dailyPace,
+            hourlyPace: hourlyPace
         )
     }
 
@@ -1168,6 +1278,143 @@ private enum CodexUsageMenuBarApp {
                     throw AppError.invalidResponse
                 }
                 print("OK rate-limit-window-classification")
+                Foundation.exit(0)
+            } catch {
+                fputs("ERROR \(error.localizedDescription)\n", stderr)
+                Foundation.exit(1)
+            }
+        }
+
+        if CommandLine.arguments.contains("--pace-test") {
+            let now = Date(timeIntervalSince1970: 1_800_000_000)
+            let reset = now.addingTimeInterval(604_800)
+            let totalWindow = LimitWindow(json: [
+                "usedPercent": 16,
+                "windowDurationMins": 10_080,
+                "resetsAt": Int(reset.timeIntervalSince1970)
+            ])!
+            let windowWithoutReset = LimitWindow(json: [
+                "usedPercent": 16,
+                "windowDurationMins": 10_080
+            ])!
+            let expiredWindow = LimitWindow(json: [
+                "usedPercent": 16,
+                "windowDurationMins": 10_080,
+                "resetsAt": Int(now.addingTimeInterval(-1).timeIntervalSince1970)
+            ])!
+            let emptyWindow = LimitWindow(json: [
+                "usedPercent": 100,
+                "windowDurationMins": 10_080,
+                "resetsAt": Int(reset.timeIntervalSince1970)
+            ])!
+
+            let dailyAtLimit = UsagePaceStatus.evaluate(
+                consumptionPercent: 12,
+                interval: 86_400,
+                totalWindow: totalWindow,
+                at: now
+            )
+            let dailyBelowLimit = UsagePaceStatus.evaluate(
+                consumptionPercent: 11,
+                interval: 86_400,
+                totalWindow: totalWindow,
+                at: now
+            )
+            let hourlyAboveLimit = UsagePaceStatus.evaluate(
+                consumptionPercent: 1,
+                interval: 3_600,
+                totalWindow: totalWindow,
+                at: now
+            )
+            let hourlyZero = UsagePaceStatus.evaluate(
+                consumptionPercent: 0,
+                interval: 3_600,
+                totalWindow: totalWindow,
+                at: now
+            )
+            let noMeasurement = UsagePaceStatus.evaluate(
+                consumptionPercent: nil,
+                interval: 3_600,
+                totalWindow: totalWindow,
+                at: now
+            )
+            let noReset = UsagePaceStatus.evaluate(
+                consumptionPercent: 1,
+                interval: 3_600,
+                totalWindow: windowWithoutReset,
+                at: now
+            )
+            let expired = UsagePaceStatus.evaluate(
+                consumptionPercent: 1,
+                interval: 3_600,
+                totalWindow: expiredWindow,
+                at: now
+            )
+            let alreadyEmpty = UsagePaceStatus.evaluate(
+                consumptionPercent: 0,
+                interval: 3_600,
+                totalWindow: emptyWindow,
+                at: now
+            )
+
+            do {
+                let snapshot = try UsageSnapshot(result: [
+                    "rateLimits": [
+                        "primary": [
+                            "usedPercent": 16,
+                            "windowDurationMins": 10_080,
+                            "resetsAt": Int(reset.timeIntervalSince1970)
+                        ],
+                        "secondary": NSNull()
+                    ]
+                ])
+                let coloredTitle = snapshot.statusAttributedTitle(
+                    dailyUsage: .usage(12, isPartial: true),
+                    hourlyUsage: .usage(0),
+                    dailyPace: .atRisk,
+                    hourlyPace: .safe
+                )
+                let title = coloredTitle.string as NSString
+                let dailyValueRange = title.range(of: "12%+")
+                let hourlyValueRange = title.range(of: "0%", options: .backwards)
+                let totalValueRange = title.range(of: "84%")
+                guard dailyAtLimit == .atRisk,
+                      dailyBelowLimit == .safe,
+                      hourlyAboveLimit == .atRisk,
+                      hourlyZero == .safe,
+                      noMeasurement == .unavailable,
+                      noReset == .unavailable,
+                      expired == .unavailable,
+                      alreadyEmpty == .atRisk,
+                      dailyValueRange.location != NSNotFound,
+                      hourlyValueRange.location != NSNotFound,
+                      totalValueRange.location != NSNotFound,
+                      let dailyColor = coloredTitle.attribute(
+                          .foregroundColor,
+                          at: dailyValueRange.location,
+                          effectiveRange: nil
+                      ) as? NSColor,
+                      dailyColor.isEqual(NSColor.systemRed),
+                      let dailySuffixColor = coloredTitle.attribute(
+                          .foregroundColor,
+                          at: NSMaxRange(dailyValueRange) - 1,
+                          effectiveRange: nil
+                      ) as? NSColor,
+                      dailySuffixColor.isEqual(NSColor.systemRed),
+                      let hourlyColor = coloredTitle.attribute(
+                          .foregroundColor,
+                          at: hourlyValueRange.location,
+                          effectiveRange: nil
+                      ) as? NSColor,
+                      hourlyColor.isEqual(NSColor.systemGreen),
+                      coloredTitle.attribute(
+                          .foregroundColor,
+                          at: totalValueRange.location,
+                          effectiveRange: nil
+                      ) == nil else {
+                    throw AppError.invalidResponse
+                }
+                print("OK pace-classification-and-coloring")
                 Foundation.exit(0)
             } catch {
                 fputs("ERROR \(error.localizedDescription)\n", stderr)

@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.6.0 - 2026-07-14
+
+- Color the `1D` and `1H` percentages red when their projected daily or hourly
+  pace would exhaust the remaining total limit by its reset, and green when
+  projected consumption stays below the remaining limit.
+- Keep the normal menu-bar color when the reset time or a measured percentage
+  is unavailable.
+- Base partial `1D …%+` projections on the known lower-bound usage.
+
 ## 1.5.3 - 2026-07-14
 
 - Rename the total-limit abbreviation from `W` to `T` and update the detailed
