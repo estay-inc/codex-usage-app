@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.5.2 - 2026-07-14
+
+- Show a lower-bound daily value such as `1D 3%+` when the app starts after
+  midnight and cannot recover the full day's usage.
+- Start partial daily tracking immediately at `1D 0%+`, then switch to the
+  exact `1D` value when the full-day total can be determined reliably.
+
 ## 1.5.1 - 2026-07-14
 
 - Rename the menu bar abbreviations from `D` and `1h` to `1D` and `1H`.

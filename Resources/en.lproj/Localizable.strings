@@ -18,8 +18,8 @@
 "menu.last_updated" = "Last updated: %@";
 "menu.last_hour_collecting" = "Last hour: Collecting data…";
 "menu.last_hour_usage" = "Last hour: Used %d%%";
-"menu.today_collecting" = "Today: Collecting data…";
 "menu.today_usage" = "Today: Used %d%%";
+"menu.today_usage_partial" = "Today: Used at least %d%%";
 "menu.launch_at_login" = "Launch at Login";
 "menu.open_chatgpt" = "Open ChatGPT";
 "menu.plan" = "Plan: %@";

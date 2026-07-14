@@ -40,9 +40,11 @@ hour. It also shows the 5-hour limit when Codex returns one.
 - `W 82%` means 82% of the weekly limit remains.
 - `1D 6%` means 6% of the weekly limit was used since local midnight.
 - `1H 2%` means 2% of the weekly limit was used during the last hour.
-- On the first day after updating, the app shows `1D …` if it cannot determine
-  the midnight baseline. It also avoids estimating across a weekly reset during
-  the day. It shows `1H …` while collecting its first hour of history.
+- Without a reliable midnight baseline, daily tracking starts immediately at
+  `1D 0%+` and increases from the earliest known sample. The `+` means the
+  actual daily usage is at least that value.
+- The app automatically removes `+` when it can determine the full-day total
+  reliably. It shows `1H …` while collecting its first hour of history.
 - The normal title is `W 82%  1D 6%  1H 2%`. When a 5-hour window is available,
   it looks like `5h 70%  W 82%  1D 6%  1H 2%`.
 - Click the status item to see used percentages, reset times, your plan, and
