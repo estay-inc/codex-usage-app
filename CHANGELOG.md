@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.5.1 - 2026-07-14
+
+- Rename the menu bar abbreviations from `D` and `1h` to `1D` and `1H`.
+
 ## 1.5.0 - 2026-07-14
 
 - Show today's weekly-limit consumption as `D` alongside weekly remaining and

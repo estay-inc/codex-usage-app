@@ -235,17 +235,17 @@ private struct UsageSnapshot {
         case .unavailable:
             break
         case .collecting:
-            components.append("D …")
+            components.append("1D …")
         case .usage(let percent):
-            components.append("D \(percent)%")
+            components.append("1D \(percent)%")
         }
         switch hourlyUsage {
         case .unavailable:
             break
         case .collecting:
-            components.append("1h …")
+            components.append("1H …")
         case .usage(let percent):
-            components.append("1h \(percent)%")
+            components.append("1H \(percent)%")
         }
         return components.isEmpty ? "Codex —" : components.joined(separator: "  ")
     }
@@ -512,7 +512,7 @@ private final class CodexAppServerClient {
                     "clientInfo": [
                         "name": "codex-usage-app",
                         "title": "Codex Usage App",
-                        "version": "1.5.0"
+                        "version": "1.5.1"
                     ]
                 ]
             ) { result in
@@ -1072,17 +1072,17 @@ private enum CodexUsageMenuBarApp {
                       weeklyOnly.statusTitle(
                           dailyUsage: .collecting,
                           hourlyUsage: .collecting
-                      ) == "W 68%  D …  1h …",
+                      ) == "W 68%  1D …  1H …",
                       weeklyOnly.statusTitle(
                           dailyUsage: .usage(7),
                           hourlyUsage: .usage(3)
-                      ) == "W 68%  D 7%  1h 3%",
+                      ) == "W 68%  1D 7%  1H 3%",
                       bothWindows.fiveHour?.remainingPercent == 95,
                       bothWindows.weekly?.remainingPercent == 69,
                       bothWindows.statusTitle(
                           dailyUsage: .usage(7),
                           hourlyUsage: .usage(3)
-                      ) == "5h 95%  W 69%  D 7%  1h 3%",
+                      ) == "5h 95%  W 69%  1D 7%  1H 3%",
                       weeklyOnly.statusTitle(
                           dailyUsage: .unavailable,
                           hourlyUsage: .unavailable
