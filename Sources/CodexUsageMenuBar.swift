@@ -229,7 +229,7 @@ private struct UsageSnapshot {
             components.append("5h \(fiveHour.remainingPercent)%")
         }
         if let weekly {
-            components.append("W \(weekly.remainingPercent)%")
+            components.append("T \(weekly.remainingPercent)%")
         }
         switch dailyUsage {
         case .unavailable:
@@ -579,7 +579,7 @@ private final class CodexAppServerClient {
                     "clientInfo": [
                         "name": "codex-usage-app",
                         "title": "Codex Usage App",
-                        "version": "1.5.2"
+                        "version": "1.5.3"
                     ]
                 ]
             ) { result in
@@ -851,7 +851,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             if let weekly = snapshot.weekly {
                 addWindow(
                     weekly,
-                    fallbackName: L10n.string("window.weekly", fallback: "Weekly limit"),
+                    fallbackName: L10n.string("window.weekly", fallback: "Total limit"),
                     to: menu
                 )
                 menu.addItem(.separator())
@@ -939,7 +939,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         if let minutes = window.durationMinutes, minutes == 300 {
             name = L10n.string("window.five_hour", fallback: "5-hour limit")
         } else if let minutes = window.durationMinutes, minutes == 10_080 {
-            name = L10n.string("window.weekly", fallback: "Weekly limit")
+            name = L10n.string("window.weekly", fallback: "Total limit")
         } else {
             name = fallbackName
         }
@@ -1055,6 +1055,7 @@ private enum CodexUsageMenuBarApp {
                     )
             )
             print("refresh=" + L10n.string("menu.refresh", fallback: "Refresh Now"))
+            print("total_limit=" + L10n.string("window.weekly", fallback: "Total limit"))
             print(
                 "today_partial="
                     + L10n.format(
@@ -1145,25 +1146,25 @@ private enum CodexUsageMenuBarApp {
                       weeklyOnly.statusTitle(
                           dailyUsage: .usage(0, isPartial: true),
                           hourlyUsage: .collecting
-                      ) == "W 68%  1D 0%+  1H …",
+                      ) == "T 68%  1D 0%+  1H …",
                       weeklyOnly.statusTitle(
                           dailyUsage: .usage(7, isPartial: false),
                           hourlyUsage: .usage(3)
-                      ) == "W 68%  1D 7%  1H 3%",
+                      ) == "T 68%  1D 7%  1H 3%",
                       weeklyOnly.statusTitle(
                           dailyUsage: .usage(4, isPartial: true),
                           hourlyUsage: .usage(3)
-                      ) == "W 68%  1D 4%+  1H 3%",
+                      ) == "T 68%  1D 4%+  1H 3%",
                       bothWindows.fiveHour?.remainingPercent == 95,
                       bothWindows.weekly?.remainingPercent == 69,
                       bothWindows.statusTitle(
                           dailyUsage: .usage(7, isPartial: false),
                           hourlyUsage: .usage(3)
-                      ) == "5h 95%  W 69%  1D 7%  1H 3%",
+                      ) == "5h 95%  T 69%  1D 7%  1H 3%",
                       weeklyOnly.statusTitle(
                           dailyUsage: .unavailable,
                           hourlyUsage: .unavailable
-                      ) == "W 68%" else {
+                      ) == "T 68%" else {
                     throw AppError.invalidResponse
                 }
                 print("OK rate-limit-window-classification")

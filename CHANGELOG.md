@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.5.3 - 2026-07-14
+
+- Rename the total-limit abbreviation from `W` to `T` and update the detailed
+  menu label from weekly to total.
+
 ## 1.5.2 - 2026-07-14
 
 - Show a lower-bound daily value such as `1D 3%+` when the app starts after

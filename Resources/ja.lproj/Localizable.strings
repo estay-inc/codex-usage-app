@@ -30,4 +30,4 @@
 "window.five_hour" = "5時間枠";
 "window.reset" = "リセット: %@";
 "window.usage" = "%@: 残り %d%%（使用 %d%%）";
-"window.weekly" = "週次枠";
+"window.weekly" = "トータル枠";

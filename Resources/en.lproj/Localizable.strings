@@ -30,4 +30,4 @@
 "window.five_hour" = "5-hour limit";
 "window.reset" = "Reset: %@";
 "window.usage" = "%@: Remaining %d%% (Used %d%%)";
-"window.weekly" = "Weekly limit";
+"window.weekly" = "Total limit";

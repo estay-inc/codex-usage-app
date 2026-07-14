@@ -5,7 +5,7 @@
 </p>
 
 An unofficial, open-source macOS menu bar utility that shows the remaining
-weekly Codex limit plus consumption since local midnight and during the last
+total Codex limit plus consumption since local midnight and during the last
 hour. It also shows the 5-hour limit when Codex returns one.
 
 [日本語 README](README.ja.md)
@@ -20,7 +20,7 @@ hour. It also shows the 5-hour limit when Codex returns one.
 
 ## What it does
 
-- Shows the remaining weekly limit (`W`), consumption today (`1D`), and rolling
+- Shows the remaining total limit (`T`), consumption today (`1D`), and rolling
   one-hour consumption (`1H`) in the menu bar.
 - Shows the remaining 5-hour limit (`5h`) only when it is available.
 - Displays used percentage, reset time, plan, and last update time.
@@ -37,16 +37,16 @@ hour. It also shows the 5-hour limit when Codex returns one.
   <img src="docs/images/usage-details.png" width="255" alt="Codex Usage App usage details menu">
 </p>
 
-- `W 82%` means 82% of the weekly limit remains.
-- `1D 6%` means 6% of the weekly limit was used since local midnight.
-- `1H 2%` means 2% of the weekly limit was used during the last hour.
+- `T 82%` means 82% of the total limit remains.
+- `1D 6%` means 6% of the total limit was used since local midnight.
+- `1H 2%` means 2% of the total limit was used during the last hour.
 - Without a reliable midnight baseline, daily tracking starts immediately at
   `1D 0%+` and increases from the earliest known sample. The `+` means the
   actual daily usage is at least that value.
 - The app automatically removes `+` when it can determine the full-day total
   reliably. It shows `1H …` while collecting its first hour of history.
-- The normal title is `W 82%  1D 6%  1H 2%`. When a 5-hour window is available,
-  it looks like `5h 70%  W 82%  1D 6%  1H 2%`.
+- The normal title is `T 82%  1D 6%  1H 2%`. When a 5-hour window is available,
+  it looks like `5h 70%  T 82%  1D 6%  1H 2%`.
 - Click the status item to see used percentages, reset times, your plan, and
   the last update time.
 
