@@ -4,8 +4,8 @@
   <img src="Resources/AppIcon.svg" width="128" alt="Codex Usage Appのアイコン">
 </p>
 
-Codexの5時間枠と週次枠の残量をmacOSのメニューバーへ表示する、非公式の
-オープンソースアプリです。
+Codexの直近1時間のUsage消費量をmacOSのメニューバーへ表示する、非公式の
+オープンソースアプリです。5時間枠が返る場合は、その残量も表示します。
 
 [English README](README.md)
 
@@ -15,21 +15,23 @@ Codexの5時間枠と週次枠の残量をmacOSのメニューバーへ表示す
 
 ## 機能
 
-- メニューバーに5時間枠（`5h`）と週次枠（`W`）の残量を表示
+- メニューバーに直近1時間の消費量（`1h`）を表示
+- 5時間枠が取得できる場合のみ、その残量（`5h`）も表示
 - 使用率、リセット日時、契約プラン、最終更新時刻を表示
 - 2分ごとに自動更新
 - macOS標準の`SMAppService`によるログイン時起動
 - macOSの言語設定に合わせて日本語・英語の表示を自動切り替え
-- 解析ツールや開発者サーバーを使用せず、Usage値を外部保存しない
+- 直近2時間のUsage履歴だけをMac内に保存し、外部へ送信しない
 
 ## 動作画面
 
 <p align="center">
-  <img src="docs/images/menu-bar-status.png" width="236" alt="macOSのメニューバーに5h 70%とW 69%を表示するCodex Usage App">
+  <img src="docs/images/usage-details.png" width="255" alt="Codex Usage AppのUsage詳細画面">
 </p>
 
-- `5h 70%`は、現在の5時間枠が70%残っていることを示します。
-- `W 69%`は、週次枠が69%残っていることを示します。
+- `1h 2%`は、直近1時間で週次枠を2%使用したことを示します。
+- 最初の1時間は履歴を計測するため、`1h …`と表示します。
+- 5時間枠も取得できる場合は、`5h 70%  1h 2%`のように表示します。
 - 表示をクリックすると、使用率、リセット日時、契約プラン、最終更新時刻を
   確認できます。
 
@@ -92,9 +94,10 @@ Codexが独自の場所にある場合は、起動前に`CODEX_PATH`へ実行フ
 
 ## プライバシー
 
-詳細は[PRIVACY.md](PRIVACY.md)を参照してください。Usage値はメモリ上でのみ
-保持します。アプリが起動するCodex App Serverは、利用者の既存アカウントと
-OpenAIの規約に基づいてOpenAIと通信します。
+詳細は[PRIVACY.md](PRIVACY.md)を参照してください。1時間の消費量を計算する
+ため、直近2時間の時刻と使用率だけをmacOSの`UserDefaults`へ保存します。
+アプリが起動するCodex App Serverは、利用者の既存アカウントとOpenAIの規約に
+基づいてOpenAIと通信します。
 
 ## ライセンスと商標
 

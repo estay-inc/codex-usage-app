@@ -4,8 +4,9 @@
   <img src="Resources/AppIcon.svg" width="128" alt="Codex Usage App icon">
 </p>
 
-An unofficial, open-source macOS menu bar utility that shows the remaining
-Codex 5-hour and weekly usage limits.
+An unofficial, open-source macOS menu bar utility that shows how much Codex
+usage was consumed during the last hour. It also shows the 5-hour limit when
+Codex returns one.
 
 [日本語 README](README.ja.md)
 
@@ -19,22 +20,25 @@ Codex 5-hour and weekly usage limits.
 
 ## What it does
 
-- Shows `5h` and weekly (`W`) remaining percentages in the menu bar.
+- Shows rolling one-hour consumption (`1h`) in the menu bar.
+- Shows the remaining 5-hour limit (`5h`) only when it is available.
 - Displays used percentage, reset time, plan, and last update time.
 - Refreshes automatically every two minutes.
 - Supports launching at login through macOS `SMAppService`.
 - Switches the app UI automatically between English and Japanese based on the
   macOS language setting.
-- Keeps usage data local; there is no analytics or developer-operated backend.
+- Keeps two hours of usage history locally; there is no analytics or
+  developer-operated backend.
 
 ## In the menu bar
 
 <p align="center">
-  <img src="docs/images/menu-bar-status.png" width="236" alt="Codex Usage App showing 5h 70% and W 69% in the macOS menu bar">
+  <img src="docs/images/usage-details.png" width="255" alt="Codex Usage App usage details menu">
 </p>
 
-- `5h 70%` means 70% remains in the current 5-hour usage window.
-- `W 69%` means 69% remains in the weekly usage window.
+- `1h 2%` means 2% of the weekly limit was used during the last hour.
+- The app shows `1h …` while collecting its first hour of history.
+- When a 5-hour window is available, the title looks like `5h 70%  1h 2%`.
 - Click the status item to see used percentages, reset times, your plan, and
   the last update time.
 

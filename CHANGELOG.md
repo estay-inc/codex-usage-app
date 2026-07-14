@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.4.0 - 2026-07-14
+
+- Replace the weekly `W` percentage in the menu bar with the percentage used
+  during the last hour.
+- Keep two hours of rate-limit samples locally so the rolling one-hour value
+  survives app restarts.
+- Show `1h …` while the first hour of history is being collected.
+
 ## 1.3.2 - 2026-07-13
 
 - Hide the `5h` placeholder from the menu bar when the App Server does not

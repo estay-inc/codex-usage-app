@@ -223,13 +223,18 @@ private struct UsageSnapshot {
     let planType: String?
     let updatedAt: Date
 
-    var statusTitle: String {
+    func statusTitle(hourlyUsage: HourlyUsageState) -> String {
         var components: [String] = []
         if let fiveHour {
             components.append("5h \(fiveHour.remainingPercent)%")
         }
-        if let weekly {
-            components.append("W \(weekly.remainingPercent)%")
+        switch hourlyUsage {
+        case .unavailable:
+            break
+        case .collecting:
+            components.append("1h …")
+        case .usage(let percent):
+            components.append("1h \(percent)%")
         }
         return components.isEmpty ? "Codex —" : components.joined(separator: "  ")
     }
@@ -248,6 +253,85 @@ private struct UsageSnapshot {
             ?? (rawSecondary?.durationMinutes == nil ? rawSecondary : nil)
         planType = rateLimits["planType"] as? String
         updatedAt = Date()
+    }
+}
+
+private enum HourlyUsageState {
+    case unavailable
+    case collecting
+    case usage(Int)
+}
+
+private struct UsageSample: Codable {
+    let recordedAt: TimeInterval
+    let usedPercent: Int
+    let durationMinutes: Int?
+    let resetsAt: TimeInterval?
+
+    func belongsToSameWindow(as other: UsageSample) -> Bool {
+        durationMinutes == other.durationMinutes && resetsAt == other.resetsAt
+    }
+}
+
+private struct UsageHistory: Codable {
+    private(set) var samples: [UsageSample] = []
+
+    mutating func record(_ window: LimitWindow, at date: Date) -> Int? {
+        let current = UsageSample(
+            recordedAt: date.timeIntervalSince1970,
+            usedPercent: window.usedPercent,
+            durationMinutes: window.durationMinutes,
+            resetsAt: window.resetsAt?.timeIntervalSince1970
+        )
+
+        if let previous = samples.last(where: { $0.belongsToSameWindow(as: current) }),
+           current.usedPercent < previous.usedPercent {
+            samples.removeAll { $0.belongsToSameWindow(as: current) }
+        }
+        samples.append(current)
+
+        let retentionStart = date.addingTimeInterval(-7_200).timeIntervalSince1970
+        samples.removeAll { $0.recordedAt < retentionStart }
+
+        let oneHourAgo = date.addingTimeInterval(-3_600).timeIntervalSince1970
+        let oldestAcceptableBaseline = oneHourAgo - 300
+        guard let baseline = samples
+            .filter({
+                $0.recordedAt >= oldestAcceptableBaseline
+                    && $0.recordedAt <= oneHourAgo
+                    && $0.belongsToSameWindow(as: current)
+            })
+            .max(by: { $0.recordedAt < $1.recordedAt }) else {
+            return nil
+        }
+        guard current.usedPercent >= baseline.usedPercent else { return nil }
+        return current.usedPercent - baseline.usedPercent
+    }
+}
+
+private final class HourlyUsageTracker {
+    private static let storageKey = "hourlyUsageHistory.v1"
+
+    private let defaults: UserDefaults
+    private var history: UsageHistory
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        if let data = defaults.data(forKey: Self.storageKey),
+           let decoded = try? PropertyListDecoder().decode(UsageHistory.self, from: data) {
+            history = decoded
+        } else {
+            history = UsageHistory()
+        }
+    }
+
+    func record(_ window: LimitWindow?, at date: Date) -> Int? {
+        guard let window else { return nil }
+        let consumption = history.record(window, at: date)
+        if let data = try? PropertyListEncoder().encode(history) {
+            defaults.set(data, forKey: Self.storageKey)
+        }
+        return consumption
     }
 }
 
@@ -334,7 +418,7 @@ private final class CodexAppServerClient {
                     "clientInfo": [
                         "name": "codex-usage-app",
                         "title": "Codex Usage App",
-                        "version": "1.3.2"
+                        "version": "1.4.0"
                     ]
                 ]
             ) { result in
@@ -463,9 +547,11 @@ private final class CodexAppServerClient {
 
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     private let client = CodexAppServerClient()
+    private let hourlyUsageTracker = HourlyUsageTracker()
     private var statusItem: NSStatusItem!
     private var refreshTimer: Timer?
     private var snapshot: UsageSnapshot?
+    private var hourlyUsage: HourlyUsageState = .unavailable
     private var errorMessage: String?
     private var isRefreshing = false
 
@@ -500,6 +586,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.isRefreshing = false
                 switch result {
                 case .success(let snapshot):
+                    if let weekly = snapshot.weekly {
+                        self.hourlyUsage = self.hourlyUsageTracker
+                            .record(weekly, at: snapshot.updatedAt)
+                            .map(HourlyUsageState.usage) ?? .collecting
+                    } else {
+                        self.hourlyUsage = .unavailable
+                    }
                     self.snapshot = snapshot
                     self.errorMessage = nil
                 case .failure(let error):
@@ -516,7 +609,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             statusItem.button?.title = "Codex —"
             return
         }
-        statusItem.button?.title = snapshot.statusTitle
+        statusItem.button?.title = snapshot.statusTitle(hourlyUsage: hourlyUsage)
     }
 
     private func rebuildMenu() {
@@ -531,18 +624,45 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
 
         if let snapshot {
-            addWindow(
-                snapshot.fiveHour,
-                fallbackName: L10n.string("window.five_hour", fallback: "5-hour limit"),
-                to: menu
-            )
-            menu.addItem(.separator())
-            addWindow(
-                snapshot.weekly,
-                fallbackName: L10n.string("window.weekly", fallback: "Weekly limit"),
-                to: menu
-            )
-            menu.addItem(.separator())
+            switch hourlyUsage {
+            case .usage(let percent):
+                addDisabled(
+                    L10n.format(
+                        "menu.last_hour_usage",
+                        fallback: "Last hour: Used %d%%",
+                        percent
+                    ),
+                    to: menu
+                )
+                menu.addItem(.separator())
+            case .collecting:
+                addDisabled(
+                    L10n.string(
+                        "menu.last_hour_collecting",
+                        fallback: "Last hour: Collecting data…"
+                    ),
+                    to: menu
+                )
+                menu.addItem(.separator())
+            case .unavailable:
+                break
+            }
+            if let fiveHour = snapshot.fiveHour {
+                addWindow(
+                    fiveHour,
+                    fallbackName: L10n.string("window.five_hour", fallback: "5-hour limit"),
+                    to: menu
+                )
+                menu.addItem(.separator())
+            }
+            if let weekly = snapshot.weekly {
+                addWindow(
+                    weekly,
+                    fallbackName: L10n.string("window.weekly", fallback: "Weekly limit"),
+                    to: menu
+                )
+                menu.addItem(.separator())
+            }
             if let plan = snapshot.planType {
                 addDisabled(
                     L10n.format("menu.plan", fallback: "Plan: %@", formatPlan(plan)),
@@ -772,7 +892,7 @@ private enum CodexUsageMenuBarApp {
                     let fiveHour = snapshot.fiveHour?.remainingPercent.description ?? "—"
                     let weekly = snapshot.weekly?.remainingPercent.description ?? "—"
                     print(
-                        "OK status=\(snapshot.statusTitle) "
+                        "OK status=\(snapshot.statusTitle(hourlyUsage: snapshot.weekly == nil ? .unavailable : .collecting)) "
                             + "5h_remaining=\(fiveHour)% weekly_remaining=\(weekly)%"
                     )
                     exitCode = 0
@@ -811,10 +931,12 @@ private enum CodexUsageMenuBarApp {
                 ])
                 guard weeklyOnly.fiveHour == nil,
                       weeklyOnly.weekly?.remainingPercent == 68,
-                      weeklyOnly.statusTitle == "W 68%",
+                      weeklyOnly.statusTitle(hourlyUsage: .collecting) == "1h …",
+                      weeklyOnly.statusTitle(hourlyUsage: .usage(3)) == "1h 3%",
                       bothWindows.fiveHour?.remainingPercent == 95,
                       bothWindows.weekly?.remainingPercent == 69,
-                      bothWindows.statusTitle == "5h 95%  W 69%" else {
+                      bothWindows.statusTitle(hourlyUsage: .usage(3)) == "5h 95%  1h 3%",
+                      weeklyOnly.statusTitle(hourlyUsage: .unavailable) == "Codex —" else {
                     throw AppError.invalidResponse
                 }
                 print("OK rate-limit-window-classification")
@@ -823,6 +945,100 @@ private enum CodexUsageMenuBarApp {
                 fputs("ERROR \(error.localizedDescription)\n", stderr)
                 Foundation.exit(1)
             }
+        }
+
+        if CommandLine.arguments.contains("--usage-history-test") {
+            let start = Date(timeIntervalSince1970: 1_800_000_000)
+            let reset = 1_800_604_800
+            func weeklyWindow(usedPercent: Int, resetsAt: Int = reset) -> LimitWindow {
+                LimitWindow(json: [
+                    "usedPercent": usedPercent,
+                    "windowDurationMins": 10_080,
+                    "resetsAt": resetsAt
+                ])!
+            }
+
+            var history = UsageHistory()
+            let initial = history.record(weeklyWindow(usedPercent: 10), at: start)
+            let halfHour = history.record(
+                weeklyWindow(usedPercent: 12),
+                at: start.addingTimeInterval(1_800)
+            )
+            let oneHour = history.record(
+                weeklyWindow(usedPercent: 14),
+                at: start.addingTimeInterval(3_600)
+            )
+            let ninetyMinutes = history.record(
+                weeklyWindow(usedPercent: 15),
+                at: start.addingTimeInterval(5_400)
+            )
+            let afterReset = history.record(
+                weeklyWindow(usedPercent: 1, resetsAt: reset + 604_800),
+                at: start.addingTimeInterval(7_200)
+            )
+            var staleHistory = UsageHistory()
+            _ = staleHistory.record(weeklyWindow(usedPercent: 20), at: start)
+            let afterNinetyMinuteGap = staleHistory.record(
+                weeklyWindow(usedPercent: 25),
+                at: start.addingTimeInterval(5_400)
+            )
+            var boundaryHistory = UsageHistory()
+            _ = boundaryHistory.record(weeklyWindow(usedPercent: 20), at: start)
+            let atSixtyFiveMinutes = boundaryHistory.record(
+                weeklyWindow(usedPercent: 24),
+                at: start.addingTimeInterval(3_900)
+            )
+            var outsideBoundaryHistory = UsageHistory()
+            _ = outsideBoundaryHistory.record(weeklyWindow(usedPercent: 20), at: start)
+            let afterSixtyFiveMinutes = outsideBoundaryHistory.record(
+                weeklyWindow(usedPercent: 24),
+                at: start.addingTimeInterval(3_901)
+            )
+            var resetWithoutTimestampHistory = UsageHistory()
+            func weeklyWindowWithoutReset(usedPercent: Int) -> LimitWindow {
+                LimitWindow(json: [
+                    "usedPercent": usedPercent,
+                    "windowDurationMins": 10_080
+                ])!
+            }
+            _ = resetWithoutTimestampHistory.record(
+                weeklyWindowWithoutReset(usedPercent: 90),
+                at: start
+            )
+            let resetWithoutTimestamp = resetWithoutTimestampHistory.record(
+                weeklyWindowWithoutReset(usedPercent: 1),
+                at: start.addingTimeInterval(3_600)
+            )
+
+            let suiteName = "CodexUsageMenuBarTests.\(UUID().uuidString)"
+            guard let defaults = UserDefaults(suiteName: suiteName) else {
+                fputs("ERROR hourly usage history defaults\n", stderr)
+                Foundation.exit(1)
+            }
+            defaults.removePersistentDomain(forName: suiteName)
+            let persistedTracker = HourlyUsageTracker(defaults: defaults)
+            _ = persistedTracker.record(weeklyWindow(usedPercent: 30), at: start)
+            let reloadedTracker = HourlyUsageTracker(defaults: defaults)
+            let persistedResult = reloadedTracker.record(
+                weeklyWindow(usedPercent: 34),
+                at: start.addingTimeInterval(3_600)
+            )
+            defaults.removePersistentDomain(forName: suiteName)
+            guard initial == nil,
+                  halfHour == nil,
+                  oneHour == 4,
+                  ninetyMinutes == 3,
+                  afterReset == nil,
+                  afterNinetyMinuteGap == nil,
+                  atSixtyFiveMinutes == 4,
+                  afterSixtyFiveMinutes == nil,
+                  resetWithoutTimestamp == nil,
+                  persistedResult == 4 else {
+                fputs("ERROR hourly usage history\n", stderr)
+                Foundation.exit(1)
+            }
+            print("OK hourly-usage-history")
+            Foundation.exit(0)
         }
 
         let app = NSApplication.shared

@@ -16,6 +16,8 @@
 "menu.error" = "エラー: %@";
 "menu.fetching" = "Usageを取得中…";
 "menu.last_updated" = "最終更新: %@";
+"menu.last_hour_collecting" = "直近1時間: 計測中…";
+"menu.last_hour_usage" = "直近1時間: 使用 %d%%";
 "menu.launch_at_login" = "ログイン時に起動";
 "menu.open_chatgpt" = "ChatGPTを開く";
 "menu.plan" = "プラン: %@";

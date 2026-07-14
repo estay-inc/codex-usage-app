@@ -23,6 +23,7 @@ test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$ROOT_DIR/build
 english_output="$("$ROOT_DIR/build/Codex Usage.app/Contents/MacOS/CodexUsageMenuBar" -AppleLanguages '(en)' --localization-test)"
 japanese_output="$("$ROOT_DIR/build/Codex Usage.app/Contents/MacOS/CodexUsageMenuBar" -AppleLanguages '(ja)' --localization-test)"
 parser_output="$("$ROOT_DIR/build/Codex Usage.app/Contents/MacOS/CodexUsageMenuBar" --rate-limit-parser-test)"
+history_output="$("$ROOT_DIR/build/Codex Usage.app/Contents/MacOS/CodexUsageMenuBar" --usage-history-test)"
 grep -Fq 'move_title=Move to the Applications folder?' <<<"$english_output"
 grep -Fq 'refresh=Refresh Now' <<<"$english_output"
 grep -Fq 'quit=Quit' <<<"$english_output"
@@ -30,6 +31,7 @@ grep -Fq 'move_title=Applicationsフォルダへ移動しますか？' <<<"$japa
 grep -Fq 'refresh=今すぐ更新' <<<"$japanese_output"
 grep -Fq 'quit=終了' <<<"$japanese_output"
 grep -Fq 'OK rate-limit-window-classification' <<<"$parser_output"
+grep -Fq 'OK hourly-usage-history' <<<"$history_output"
 
 install_test_dir="$(mktemp -d "$ROOT_DIR/build/install-test.XXXXXX")"
 trap 'rm -rf "$install_test_dir"' EXIT
