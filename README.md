@@ -4,9 +4,9 @@
   <img src="Resources/AppIcon.svg" width="128" alt="Codex Usage App icon">
 </p>
 
-An unofficial, open-source macOS menu bar utility that shows how much Codex
-usage was consumed during the last hour. It also shows the 5-hour limit when
-Codex returns one.
+An unofficial, open-source macOS menu bar utility that shows the remaining
+weekly Codex limit and how much was consumed during the last hour. It also
+shows the 5-hour limit when Codex returns one.
 
 [日本語 README](README.ja.md)
 
@@ -20,7 +20,8 @@ Codex returns one.
 
 ## What it does
 
-- Shows rolling one-hour consumption (`1h`) in the menu bar.
+- Shows the remaining weekly limit (`W`) and rolling one-hour consumption
+  (`1h`) in the menu bar.
 - Shows the remaining 5-hour limit (`5h`) only when it is available.
 - Displays used percentage, reset time, plan, and last update time.
 - Refreshes automatically every two minutes.
@@ -36,9 +37,11 @@ Codex returns one.
   <img src="docs/images/usage-details.png" width="255" alt="Codex Usage App usage details menu">
 </p>
 
+- `W 82%` means 82% of the weekly limit remains.
 - `1h 2%` means 2% of the weekly limit was used during the last hour.
-- The app shows `1h …` while collecting its first hour of history.
-- When a 5-hour window is available, the title looks like `5h 70%  1h 2%`.
+- The app shows `W 82%  1h …` while collecting its first hour of history.
+- When a 5-hour window is available, the title looks like
+  `5h 70%  W 82%  1h 2%`.
 - Click the status item to see used percentages, reset times, your plan, and
   the last update time.
 
@@ -100,9 +103,10 @@ path of the executable before launching the app.
 
 ## Privacy
 
-See [PRIVACY.md](PRIVACY.md). Usage values are held only in memory. The app
-starts the locally installed Codex App Server, which communicates with OpenAI
-under the user's existing account and OpenAI terms.
+See [PRIVACY.md](PRIVACY.md). To calculate one-hour consumption, the app keeps
+only the last two hours of timestamps and usage percentages in macOS
+`UserDefaults`. The app starts the locally installed Codex App Server, which
+communicates with OpenAI under the user's existing account and OpenAI terms.
 
 ## Contributing
 

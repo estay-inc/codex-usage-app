@@ -228,6 +228,9 @@ private struct UsageSnapshot {
         if let fiveHour {
             components.append("5h \(fiveHour.remainingPercent)%")
         }
+        if let weekly {
+            components.append("W \(weekly.remainingPercent)%")
+        }
         switch hourlyUsage {
         case .unavailable:
             break
@@ -418,7 +421,7 @@ private final class CodexAppServerClient {
                     "clientInfo": [
                         "name": "codex-usage-app",
                         "title": "Codex Usage App",
-                        "version": "1.4.0"
+                        "version": "1.4.1"
                     ]
                 ]
             ) { result in
@@ -931,12 +934,12 @@ private enum CodexUsageMenuBarApp {
                 ])
                 guard weeklyOnly.fiveHour == nil,
                       weeklyOnly.weekly?.remainingPercent == 68,
-                      weeklyOnly.statusTitle(hourlyUsage: .collecting) == "1h …",
-                      weeklyOnly.statusTitle(hourlyUsage: .usage(3)) == "1h 3%",
+                      weeklyOnly.statusTitle(hourlyUsage: .collecting) == "W 68%  1h …",
+                      weeklyOnly.statusTitle(hourlyUsage: .usage(3)) == "W 68%  1h 3%",
                       bothWindows.fiveHour?.remainingPercent == 95,
                       bothWindows.weekly?.remainingPercent == 69,
-                      bothWindows.statusTitle(hourlyUsage: .usage(3)) == "5h 95%  1h 3%",
-                      weeklyOnly.statusTitle(hourlyUsage: .unavailable) == "Codex —" else {
+                      bothWindows.statusTitle(hourlyUsage: .usage(3)) == "5h 95%  W 69%  1h 3%",
+                      weeklyOnly.statusTitle(hourlyUsage: .unavailable) == "W 68%" else {
                     throw AppError.invalidResponse
                 }
                 print("OK rate-limit-window-classification")

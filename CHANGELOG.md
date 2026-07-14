@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.4.1 - 2026-07-14
+
+- Show both the remaining weekly limit (`W`) and rolling one-hour consumption
+  (`1h`) in the menu bar.
+
 ## 1.4.0 - 2026-07-14
 
 - Replace the weekly `W` percentage in the menu bar with the percentage used
