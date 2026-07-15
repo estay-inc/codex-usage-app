@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.6.1 - 2026-07-15
+
+- Remove the red and green depletion-risk colors from the `1D` and `1H`
+  percentages and restore the standard menu-bar text color.
+
 ## 1.6.0 - 2026-07-14
 
 - Color the `1D` and `1H` percentages red when their projected daily or hourly

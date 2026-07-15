@@ -22,8 +22,6 @@ hour. It also shows the 5-hour limit when Codex returns one.
 
 - Shows the remaining total limit (`T`), consumption today (`1D`), and rolling
   one-hour consumption (`1H`) in the menu bar.
-- Colors the `1D` and `1H` percentages by whether their projected pace would
-  exhaust the total limit before its reset.
 - Shows the remaining 5-hour limit (`5h`) only when it is available.
 - Displays used percentage, reset time, plan, and last update time.
 - Refreshes automatically every two minutes.
@@ -42,13 +40,6 @@ hour. It also shows the 5-hour limit when Codex returns one.
 - `T 82%` means 82% of the total limit remains.
 - `1D 6%` means 6% of the total limit was used since local midnight.
 - `1H 2%` means 2% of the total limit was used during the last hour.
-- The `1D` and `1H` percentages are projected to the reset time by treating
-  their displayed values as consumption per day and per hour. A value is red
-  when projected consumption reaches or exceeds the current `T` remaining,
-  and green when it stays below it.
-- Values use the normal menu-bar color when the reset time or a measurement is
-  unavailable. A partial `1D …%+` forecast uses only its known lower bound, so
-  green is not a guarantee that the limit will not be exhausted.
 - Without a reliable midnight baseline, daily tracking starts immediately at
   `1D 0%+` and increases from the earliest known sample. The `+` means the
   actual daily usage is at least that value.
