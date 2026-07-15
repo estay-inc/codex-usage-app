@@ -223,7 +223,7 @@ private struct UsageSnapshot {
     let planType: String?
     let updatedAt: Date
 
-    func statusTitle(dailyUsage: DailyUsageState, hourlyUsage: TrackedUsageState) -> String {
+    func statusTitle(dailyUsage: DailyUsageState) -> String {
         var components: [String] = []
         if let fiveHour {
             components.append("5h \(fiveHour.remainingPercent)%")
@@ -234,16 +234,8 @@ private struct UsageSnapshot {
         switch dailyUsage {
         case .unavailable:
             break
-        case .usage(let percent, let isPartial):
-            components.append("1D \(percent)%\(isPartial ? "+" : "")")
-        }
-        switch hourlyUsage {
-        case .unavailable:
-            break
-        case .collecting:
-            components.append("1H …")
         case .usage(let percent):
-            components.append("1H \(percent)%")
+            components.append("D \(percent)%")
         }
         return components.isEmpty ? "Codex —" : components.joined(separator: "  ")
     }
@@ -265,15 +257,9 @@ private struct UsageSnapshot {
     }
 }
 
-private enum TrackedUsageState {
-    case unavailable
-    case collecting
-    case usage(Int)
-}
-
 private enum DailyUsageState {
     case unavailable
-    case usage(Int, isPartial: Bool)
+    case usage(Int)
 }
 
 private struct UsageSample: Codable {
@@ -290,7 +276,7 @@ private struct UsageSample: Codable {
 private struct UsageHistory: Codable {
     private(set) var samples: [UsageSample] = []
 
-    mutating func record(_ window: LimitWindow, at date: Date) -> Int? {
+    mutating func record(_ window: LimitWindow, at date: Date) {
         let current = UsageSample(
             recordedAt: date.timeIntervalSince1970,
             usedPercent: window.usedPercent,
@@ -301,20 +287,6 @@ private struct UsageHistory: Codable {
 
         let retentionStart = date.addingTimeInterval(-172_800).timeIntervalSince1970
         samples.removeAll { $0.recordedAt < retentionStart }
-
-        let oneHourAgo = date.addingTimeInterval(-3_600).timeIntervalSince1970
-        let oldestAcceptableBaseline = oneHourAgo - 300
-        guard let baseline = samples
-            .filter({
-                $0.recordedAt >= oldestAcceptableBaseline
-                    && $0.recordedAt <= oneHourAgo
-                    && $0.belongsToSameWindow(as: current)
-            })
-            .max(by: { $0.recordedAt < $1.recordedAt }) else {
-            return nil
-        }
-        guard current.usedPercent >= baseline.usedPercent else { return nil }
-        return current.usedPercent - baseline.usedPercent
     }
 
     func usageToday(
@@ -446,11 +418,6 @@ private struct DailyUsage {
     let isPartial: Bool
 }
 
-private struct TrackedUsage {
-    let hourlyPercent: Int?
-    let dailyUsage: DailyUsage?
-}
-
 private final class UsageTracker {
     // Keep the original key so users retain history when upgrading from 1.4.x.
     private static let storageKey = "hourlyUsageHistory.v1"
@@ -472,11 +439,9 @@ private final class UsageTracker {
         _ window: LimitWindow?,
         at date: Date,
         calendar: Calendar = .autoupdatingCurrent
-    ) -> TrackedUsage {
-        guard let window else {
-            return TrackedUsage(hourlyPercent: nil, dailyUsage: nil)
-        }
-        let hourlyPercent = history.record(window, at: date)
+    ) -> DailyUsage? {
+        guard let window else { return nil }
+        history.record(window, at: date)
         let dailyUsage: DailyUsage
         if let exactPercent = history.usageToday(at: date, calendar: calendar) {
             dailyUsage = DailyUsage(percent: exactPercent, isPartial: false)
@@ -489,10 +454,7 @@ private final class UsageTracker {
         if let data = try? PropertyListEncoder().encode(history) {
             defaults.set(data, forKey: Self.storageKey)
         }
-        return TrackedUsage(
-            hourlyPercent: hourlyPercent,
-            dailyUsage: dailyUsage
-        )
+        return dailyUsage
     }
 }
 
@@ -579,7 +541,7 @@ private final class CodexAppServerClient {
                     "clientInfo": [
                         "name": "codex-usage-app",
                         "title": "Codex Usage App",
-                        "version": "1.6.1"
+                        "version": "1.7.0"
                     ]
                 ]
             ) { result in
@@ -712,7 +674,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var refreshTimer: Timer?
     private var snapshot: UsageSnapshot?
-    private var hourlyUsage: TrackedUsageState = .unavailable
     private var dailyUsage: DailyUsageState = .unavailable
     private var errorMessage: String?
     private var isRefreshing = false
@@ -749,22 +710,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
                 switch result {
                 case .success(let snapshot):
                     if let weekly = snapshot.weekly {
-                        let trackedUsage = self.usageTracker.record(
+                        let dailyUsage = self.usageTracker.record(
                             weekly,
                             at: snapshot.updatedAt
                         )
-                        self.hourlyUsage = trackedUsage.hourlyPercent
-                            .map(TrackedUsageState.usage) ?? .collecting
-                        if let dailyUsage = trackedUsage.dailyUsage {
-                            self.dailyUsage = .usage(
-                                dailyUsage.percent,
-                                isPartial: dailyUsage.isPartial
-                            )
+                        if let dailyUsage {
+                            self.dailyUsage = .usage(dailyUsage.percent)
                         } else {
                             self.dailyUsage = .unavailable
                         }
                     } else {
-                        self.hourlyUsage = .unavailable
                         self.dailyUsage = .unavailable
                     }
                     self.snapshot = snapshot
@@ -783,10 +738,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             statusItem.button?.title = "Codex —"
             return
         }
-        statusItem.button?.title = snapshot.statusTitle(
-            dailyUsage: dailyUsage,
-            hourlyUsage: hourlyUsage
-        )
+        statusItem.button?.title = snapshot.statusTitle(dailyUsage: dailyUsage)
     }
 
     private func rebuildMenu() {
@@ -802,37 +754,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if let snapshot {
             switch dailyUsage {
-            case .usage(let percent, let isPartial):
-                addDisabled(
-                    L10n.format(
-                        isPartial ? "menu.today_usage_partial" : "menu.today_usage",
-                        fallback: isPartial
-                            ? "Today: Used at least %d%%"
-                            : "Today: Used %d%%",
-                        percent
-                    ),
-                    to: menu
-                )
-                menu.addItem(.separator())
-            case .unavailable:
-                break
-            }
-            switch hourlyUsage {
             case .usage(let percent):
                 addDisabled(
                     L10n.format(
-                        "menu.last_hour_usage",
-                        fallback: "Last hour: Used %d%%",
+                        "menu.today_usage",
+                        fallback: "Today: Used %d%%",
                         percent
-                    ),
-                    to: menu
-                )
-                menu.addItem(.separator())
-            case .collecting:
-                addDisabled(
-                    L10n.string(
-                        "menu.last_hour_collecting",
-                        fallback: "Last hour: Collecting data…"
                     ),
                     to: menu
                 )
@@ -1056,14 +983,7 @@ private enum CodexUsageMenuBarApp {
             )
             print("refresh=" + L10n.string("menu.refresh", fallback: "Refresh Now"))
             print("total_limit=" + L10n.string("window.weekly", fallback: "Total limit"))
-            print(
-                "today_partial="
-                    + L10n.format(
-                        "menu.today_usage_partial",
-                        fallback: "Today: Used at least %d%%",
-                        3
-                    )
-            )
+            print("today=" + L10n.format("menu.today_usage", fallback: "Today: Used %d%%", 3))
             print("quit=" + L10n.string("menu.quit", fallback: "Quit"))
             Foundation.exit(0)
         }
@@ -1093,16 +1013,10 @@ private enum CodexUsageMenuBarApp {
                 case .success(let snapshot):
                     let fiveHour = snapshot.fiveHour?.remainingPercent.description ?? "—"
                     let weekly = snapshot.weekly?.remainingPercent.description ?? "—"
-                    let hourlyState: TrackedUsageState = snapshot.weekly == nil
-                        ? .unavailable
-                        : .collecting
                     let dailyState: DailyUsageState = snapshot.weekly == nil
                         ? .unavailable
-                        : .usage(0, isPartial: true)
-                    let status = snapshot.statusTitle(
-                        dailyUsage: dailyState,
-                        hourlyUsage: hourlyState
-                    )
+                        : .usage(0)
+                    let status = snapshot.statusTitle(dailyUsage: dailyState)
                     print(
                         "OK status=\(status) "
                             + "5h_remaining=\(fiveHour)% weekly_remaining=\(weekly)%"
@@ -1143,28 +1057,14 @@ private enum CodexUsageMenuBarApp {
                 ])
                 guard weeklyOnly.fiveHour == nil,
                       weeklyOnly.weekly?.remainingPercent == 68,
-                      weeklyOnly.statusTitle(
-                          dailyUsage: .usage(0, isPartial: true),
-                          hourlyUsage: .collecting
-                      ) == "T 68%  1D 0%+  1H …",
-                      weeklyOnly.statusTitle(
-                          dailyUsage: .usage(7, isPartial: false),
-                          hourlyUsage: .usage(3)
-                      ) == "T 68%  1D 7%  1H 3%",
-                      weeklyOnly.statusTitle(
-                          dailyUsage: .usage(4, isPartial: true),
-                          hourlyUsage: .usage(3)
-                      ) == "T 68%  1D 4%+  1H 3%",
+                      weeklyOnly.statusTitle(dailyUsage: .usage(0)) == "T 68%  D 0%",
+                      weeklyOnly.statusTitle(dailyUsage: .usage(7)) == "T 68%  D 7%",
+                      weeklyOnly.statusTitle(dailyUsage: .usage(4)) == "T 68%  D 4%",
                       bothWindows.fiveHour?.remainingPercent == 95,
                       bothWindows.weekly?.remainingPercent == 69,
-                      bothWindows.statusTitle(
-                          dailyUsage: .usage(7, isPartial: false),
-                          hourlyUsage: .usage(3)
-                      ) == "5h 95%  T 69%  1D 7%  1H 3%",
-                      weeklyOnly.statusTitle(
-                          dailyUsage: .unavailable,
-                          hourlyUsage: .unavailable
-                      ) == "T 68%" else {
+                      bothWindows.statusTitle(dailyUsage: .usage(7))
+                        == "5h 95%  T 69%  D 7%",
+                      weeklyOnly.statusTitle(dailyUsage: .unavailable) == "T 68%" else {
                     throw AppError.invalidResponse
                 }
                 print("OK rate-limit-window-classification")
@@ -1176,7 +1076,6 @@ private enum CodexUsageMenuBarApp {
         }
 
         if CommandLine.arguments.contains("--usage-history-test") {
-            let start = Date(timeIntervalSince1970: 1_800_000_000)
             let reset = 1_800_604_800
             func weeklyWindow(usedPercent: Int, resetsAt: Int = reset) -> LimitWindow {
                 LimitWindow(json: [
@@ -1185,58 +1084,12 @@ private enum CodexUsageMenuBarApp {
                     "resetsAt": resetsAt
                 ])!
             }
-
-            var history = UsageHistory()
-            let initial = history.record(weeklyWindow(usedPercent: 10), at: start)
-            let halfHour = history.record(
-                weeklyWindow(usedPercent: 12),
-                at: start.addingTimeInterval(1_800)
-            )
-            let oneHour = history.record(
-                weeklyWindow(usedPercent: 14),
-                at: start.addingTimeInterval(3_600)
-            )
-            let ninetyMinutes = history.record(
-                weeklyWindow(usedPercent: 15),
-                at: start.addingTimeInterval(5_400)
-            )
-            let afterReset = history.record(
-                weeklyWindow(usedPercent: 1, resetsAt: reset + 604_800),
-                at: start.addingTimeInterval(7_200)
-            )
-            var staleHistory = UsageHistory()
-            _ = staleHistory.record(weeklyWindow(usedPercent: 20), at: start)
-            let afterNinetyMinuteGap = staleHistory.record(
-                weeklyWindow(usedPercent: 25),
-                at: start.addingTimeInterval(5_400)
-            )
-            var boundaryHistory = UsageHistory()
-            _ = boundaryHistory.record(weeklyWindow(usedPercent: 20), at: start)
-            let atSixtyFiveMinutes = boundaryHistory.record(
-                weeklyWindow(usedPercent: 24),
-                at: start.addingTimeInterval(3_900)
-            )
-            var outsideBoundaryHistory = UsageHistory()
-            _ = outsideBoundaryHistory.record(weeklyWindow(usedPercent: 20), at: start)
-            let afterSixtyFiveMinutes = outsideBoundaryHistory.record(
-                weeklyWindow(usedPercent: 24),
-                at: start.addingTimeInterval(3_901)
-            )
-            var resetWithoutTimestampHistory = UsageHistory()
             func weeklyWindowWithoutReset(usedPercent: Int) -> LimitWindow {
                 LimitWindow(json: [
                     "usedPercent": usedPercent,
                     "windowDurationMins": 10_080
                 ])!
             }
-            _ = resetWithoutTimestampHistory.record(
-                weeklyWindowWithoutReset(usedPercent: 90),
-                at: start
-            )
-            let resetWithoutTimestamp = resetWithoutTimestampHistory.record(
-                weeklyWindowWithoutReset(usedPercent: 1),
-                at: start.addingTimeInterval(3_600)
-            )
 
             var utcCalendar = Calendar(identifier: .gregorian)
             utcCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
@@ -1248,15 +1101,15 @@ private enum CodexUsageMenuBarApp {
             let dailyReset = Int(midnight.timeIntervalSince1970) + 432_000
 
             var dailyHistory = UsageHistory()
-            _ = dailyHistory.record(
+            dailyHistory.record(
                 weeklyWindow(usedPercent: 20, resetsAt: dailyReset),
                 at: midnight.addingTimeInterval(-120)
             )
-            _ = dailyHistory.record(
+            dailyHistory.record(
                 weeklyWindow(usedPercent: 20, resetsAt: dailyReset),
                 at: midnight.addingTimeInterval(120)
             )
-            _ = dailyHistory.record(
+            dailyHistory.record(
                 weeklyWindow(usedPercent: 26, resetsAt: dailyReset),
                 at: midnight.addingTimeInterval(21_600)
             )
@@ -1266,15 +1119,15 @@ private enum CodexUsageMenuBarApp {
             )
 
             var changedAtMidnightHistory = UsageHistory()
-            _ = changedAtMidnightHistory.record(
+            changedAtMidnightHistory.record(
                 weeklyWindow(usedPercent: 20, resetsAt: dailyReset),
                 at: midnight.addingTimeInterval(-10)
             )
-            _ = changedAtMidnightHistory.record(
+            changedAtMidnightHistory.record(
                 weeklyWindow(usedPercent: 21, resetsAt: dailyReset),
                 at: midnight.addingTimeInterval(0.8)
             )
-            _ = changedAtMidnightHistory.record(
+            changedAtMidnightHistory.record(
                 weeklyWindow(usedPercent: 26, resetsAt: dailyReset),
                 at: midnight.addingTimeInterval(21_600)
             )
@@ -1288,7 +1141,7 @@ private enum CodexUsageMenuBarApp {
             )
 
             var earlyLaunchHistory = UsageHistory()
-            _ = earlyLaunchHistory.record(
+            earlyLaunchHistory.record(
                 weeklyWindow(usedPercent: 20, resetsAt: dailyReset),
                 at: midnight.addingTimeInterval(240)
             )
@@ -1302,7 +1155,7 @@ private enum CodexUsageMenuBarApp {
             )
 
             var middayLaunchHistory = UsageHistory()
-            _ = middayLaunchHistory.record(
+            middayLaunchHistory.record(
                 weeklyWindow(usedPercent: 40, resetsAt: dailyReset),
                 at: midnight.addingTimeInterval(43_200)
             )
@@ -1314,7 +1167,7 @@ private enum CodexUsageMenuBarApp {
                 at: midnight.addingTimeInterval(43_200),
                 calendar: utcCalendar
             )
-            _ = middayLaunchHistory.record(
+            middayLaunchHistory.record(
                 weeklyWindow(usedPercent: 43, resetsAt: dailyReset),
                 at: midnight.addingTimeInterval(46_800)
             )
@@ -1327,19 +1180,19 @@ private enum CodexUsageMenuBarApp {
             let oldReset = Int(resetTime.timeIntervalSince1970)
             let newReset = oldReset + 604_800
             var dailyResetHistory = UsageHistory()
-            _ = dailyResetHistory.record(
+            dailyResetHistory.record(
                 weeklyWindow(usedPercent: 90, resetsAt: oldReset),
                 at: midnight.addingTimeInterval(60)
             )
-            _ = dailyResetHistory.record(
+            dailyResetHistory.record(
                 weeklyWindow(usedPercent: 95, resetsAt: oldReset),
                 at: resetTime.addingTimeInterval(-60)
             )
-            _ = dailyResetHistory.record(
+            dailyResetHistory.record(
                 weeklyWindow(usedPercent: 1, resetsAt: newReset),
                 at: resetTime.addingTimeInterval(60)
             )
-            _ = dailyResetHistory.record(
+            dailyResetHistory.record(
                 weeklyWindow(usedPercent: 3, resetsAt: newReset),
                 at: resetTime.addingTimeInterval(3_600)
             )
@@ -1355,15 +1208,15 @@ private enum CodexUsageMenuBarApp {
             let midnightReset = Int(midnight.timeIntervalSince1970)
             let afterMidnightReset = midnightReset + 604_800
             var midnightResetHistory = UsageHistory()
-            _ = midnightResetHistory.record(
+            midnightResetHistory.record(
                 weeklyWindow(usedPercent: 95, resetsAt: midnightReset),
                 at: midnight.addingTimeInterval(-60)
             )
-            _ = midnightResetHistory.record(
+            midnightResetHistory.record(
                 weeklyWindow(usedPercent: 1, resetsAt: afterMidnightReset),
                 at: midnight.addingTimeInterval(60)
             )
-            _ = midnightResetHistory.record(
+            midnightResetHistory.record(
                 weeklyWindow(usedPercent: 3, resetsAt: afterMidnightReset),
                 at: midnight.addingTimeInterval(3_600)
             )
@@ -1373,15 +1226,15 @@ private enum CodexUsageMenuBarApp {
             )
 
             var resetGapHistory = UsageHistory()
-            _ = resetGapHistory.record(
+            resetGapHistory.record(
                 weeklyWindow(usedPercent: 90, resetsAt: oldReset),
                 at: midnight.addingTimeInterval(60)
             )
-            _ = resetGapHistory.record(
+            resetGapHistory.record(
                 weeklyWindow(usedPercent: 95, resetsAt: oldReset),
                 at: resetTime.addingTimeInterval(-3_600)
             )
-            _ = resetGapHistory.record(
+            resetGapHistory.record(
                 weeklyWindow(usedPercent: 2, resetsAt: newReset),
                 at: resetTime.addingTimeInterval(3_600)
             )
@@ -1397,11 +1250,11 @@ private enum CodexUsageMenuBarApp {
             let correctedWindowStart = midnight.addingTimeInterval(28_800)
             let correctedReset = Int(correctedWindowStart.timeIntervalSince1970) + 604_800
             var correctedResetHistory = UsageHistory()
-            _ = correctedResetHistory.record(
+            correctedResetHistory.record(
                 weeklyWindow(usedPercent: 4, resetsAt: correctedReset),
                 at: midnight.addingTimeInterval(43_200)
             )
-            _ = correctedResetHistory.record(
+            correctedResetHistory.record(
                 weeklyWindow(usedPercent: 4, resetsAt: correctedReset + 300),
                 at: midnight.addingTimeInterval(43_320)
             )
@@ -1411,11 +1264,11 @@ private enum CodexUsageMenuBarApp {
             )
 
             var unknownResetHistory = UsageHistory()
-            _ = unknownResetHistory.record(
+            unknownResetHistory.record(
                 weeklyWindowWithoutReset(usedPercent: 90),
                 at: midnight.addingTimeInterval(60)
             )
-            _ = unknownResetHistory.record(
+            unknownResetHistory.record(
                 weeklyWindowWithoutReset(usedPercent: 1),
                 at: resetTime
             )
@@ -1427,7 +1280,7 @@ private enum CodexUsageMenuBarApp {
                 at: resetTime,
                 calendar: utcCalendar
             )
-            _ = unknownResetHistory.record(
+            unknownResetHistory.record(
                 weeklyWindowWithoutReset(usedPercent: 2),
                 at: resetTime.addingTimeInterval(3_600)
             )
@@ -1451,11 +1304,11 @@ private enum CodexUsageMenuBarApp {
                 minute: 30
             ))!
             var springDSTHistory = UsageHistory()
-            _ = springDSTHistory.record(
+            springDSTHistory.record(
                 weeklyWindow(usedPercent: 10),
                 at: springDSTStart
             )
-            _ = springDSTHistory.record(
+            springDSTHistory.record(
                 weeklyWindow(usedPercent: 15),
                 at: springDSTEnd
             )
@@ -1477,11 +1330,11 @@ private enum CodexUsageMenuBarApp {
                 minute: 30
             ))!
             var fallDSTHistory = UsageHistory()
-            _ = fallDSTHistory.record(
+            fallDSTHistory.record(
                 weeklyWindow(usedPercent: 30),
                 at: fallDSTStart
             )
-            _ = fallDSTHistory.record(
+            fallDSTHistory.record(
                 weeklyWindow(usedPercent: 37),
                 at: fallDSTEnd
             )
@@ -1492,7 +1345,7 @@ private enum CodexUsageMenuBarApp {
 
             let suiteName = "CodexUsageMenuBarTests.\(UUID().uuidString)"
             guard let defaults = UserDefaults(suiteName: suiteName) else {
-                fputs("ERROR hourly usage history defaults\n", stderr)
+                fputs("ERROR daily usage history defaults\n", stderr)
                 Foundation.exit(1)
             }
             defaults.removePersistentDomain(forName: suiteName)
@@ -1527,22 +1380,12 @@ private enum CodexUsageMenuBarApp {
                 calendar: utcCalendar
             )
             defaults.removePersistentDomain(forName: suiteName)
-            guard initial == nil,
-                  halfHour == nil,
-                  oneHour == 4,
-                  ninetyMinutes == 3,
-                  afterReset == nil,
-                  afterNinetyMinuteGap == nil,
-                  atSixtyFiveMinutes == 4,
-                  afterSixtyFiveMinutes == nil,
-                  resetWithoutTimestamp == nil,
-                  persistedResult.hourlyPercent == 4,
-                  persistedResult.dailyUsage?.percent == 4,
-                  persistedResult.dailyUsage?.isPartial == false,
-                  partialInitialResult.dailyUsage?.percent == 0,
-                  partialInitialResult.dailyUsage?.isPartial == true,
-                  partialLaterResult.dailyUsage?.percent == 3,
-                  partialLaterResult.dailyUsage?.isPartial == true,
+            guard persistedResult?.percent == 4,
+                  persistedResult?.isPartial == false,
+                  partialInitialResult?.percent == 0,
+                  partialInitialResult?.isPartial == true,
+                  partialLaterResult?.percent == 3,
+                  partialLaterResult?.isPartial == true,
                   dailySixPercent == 6,
                   changedAtMidnight == nil,
                   changedAtMidnightPartial == 5,
@@ -1565,7 +1408,6 @@ private enum CodexUsageMenuBarApp {
                 fputs("ERROR usage history\n", stderr)
                 Foundation.exit(1)
             }
-            print("OK hourly-usage-history")
             print("OK daily-usage-history")
             Foundation.exit(0)
         }

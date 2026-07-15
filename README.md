@@ -5,8 +5,8 @@
 </p>
 
 An unofficial, open-source macOS menu bar utility that shows the remaining
-total Codex limit plus consumption since local midnight and during the last
-hour. It also shows the 5-hour limit when Codex returns one.
+total Codex limit plus consumption observed today. It also shows the 5-hour
+limit when Codex returns one.
 
 [日本語 README](README.ja.md)
 
@@ -20,8 +20,8 @@ hour. It also shows the 5-hour limit when Codex returns one.
 
 ## What it does
 
-- Shows the remaining total limit (`T`), consumption today (`1D`), and rolling
-  one-hour consumption (`1H`) in the menu bar.
+- Shows the remaining total limit (`T`) and consumption today (`D`) in the
+  menu bar.
 - Shows the remaining 5-hour limit (`5h`) only when it is available.
 - Displays used percentage, reset time, plan, and last update time.
 - Refreshes automatically every two minutes.
@@ -38,15 +38,11 @@ hour. It also shows the 5-hour limit when Codex returns one.
 </p>
 
 - `T 82%` means 82% of the total limit remains.
-- `1D 6%` means 6% of the total limit was used since local midnight.
-- `1H 2%` means 2% of the total limit was used during the last hour.
-- Without a reliable midnight baseline, daily tracking starts immediately at
-  `1D 0%+` and increases from the earliest known sample. The `+` means the
-  actual daily usage is at least that value.
-- The app automatically removes `+` when it can determine the full-day total
-  reliably. It shows `1H …` while collecting its first hour of history.
-- The normal title is `T 82%  1D 6%  1H 2%`. When a 5-hour window is available,
-  it looks like `5h 70%  T 82%  1D 6%  1H 2%`.
+- `D 6%` means 6% of the total limit has been observed as used today.
+- Without a reliable midnight baseline, daily tracking starts at `D 0%` and
+  shows the usage observed after the app starts.
+- The normal title is `T 82%  D 6%`. When a 5-hour window is available, it
+  looks like `5h 70%  T 82%  D 6%`.
 - Click the status item to see used percentages, reset times, your plan, and
   the last update time.
 
@@ -108,8 +104,8 @@ path of the executable before launching the app.
 
 ## Privacy
 
-See [PRIVACY.md](PRIVACY.md). To calculate daily and one-hour consumption, the
-app keeps only the last 48 hours of timestamps and usage percentages in macOS
+See [PRIVACY.md](PRIVACY.md). To calculate daily consumption, the app keeps
+only the last 48 hours of timestamps and usage percentages in macOS
 `UserDefaults`. The app starts the locally installed Codex App Server, which
 communicates with OpenAI under the user's existing account and OpenAI terms.
 

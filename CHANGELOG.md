@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.7.0 - 2026-07-15
+
+- Remove rolling one-hour usage (`1H`) from the menu bar and detail menu.
+- Rename daily usage from `1D` to `D` and remove the `+` marker from partial
+  daily values.
+
 ## 1.6.1 - 2026-07-15
 
 - Remove the red and green depletion-risk colors from the `1D` and `1H`
