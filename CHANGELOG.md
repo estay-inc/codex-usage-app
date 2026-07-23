@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.7.1 - 2026-07-23
+
+- Keep daily usage stable when Codex adjusts a rate-limit reset timestamp by a
+  few seconds.
+- Ignore small downward usage corrections when accumulating today's observed
+  consumption, while preserving real rate-limit resets.
+
 ## 1.7.0 - 2026-07-15
 
 - Remove rolling one-hour usage (`1H`) from the menu bar and detail menu.

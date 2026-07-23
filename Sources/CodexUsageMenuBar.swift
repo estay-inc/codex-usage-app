@@ -263,23 +263,48 @@ private enum DailyUsageState {
 }
 
 private struct UsageSample: Codable {
+    private static let resetTimeTolerance: TimeInterval = 5
+
     let recordedAt: TimeInterval
     let usedPercent: Int
     let durationMinutes: Int?
     let resetsAt: TimeInterval?
 
     func belongsToSameWindow(as other: UsageSample) -> Bool {
-        durationMinutes == other.durationMinutes && resetsAt == other.resetsAt
+        guard durationMinutes == other.durationMinutes else { return false }
+        switch (resetsAt, other.resetsAt) {
+        case (nil, nil):
+            return true
+        case let (left?, right?):
+            return abs(left - right) <= Self.resetTimeTolerance
+        default:
+            return false
+        }
     }
 }
 
 private struct UsageHistory: Codable {
+    private static let usageCorrectionTolerance = 2
+
     private(set) var samples: [UsageSample] = []
 
     mutating func record(_ window: LimitWindow, at date: Date) {
+        var usedPercent = window.usedPercent
+        let rawSample = UsageSample(
+            recordedAt: date.timeIntervalSince1970,
+            usedPercent: usedPercent,
+            durationMinutes: window.durationMinutes,
+            resetsAt: window.resetsAt?.timeIntervalSince1970
+        )
+        if let previous = samples.last,
+           rawSample.belongsToSameWindow(as: previous),
+           previous.usedPercent > usedPercent,
+           previous.usedPercent - usedPercent <= Self.usageCorrectionTolerance {
+            usedPercent = previous.usedPercent
+        }
         let current = UsageSample(
             recordedAt: date.timeIntervalSince1970,
-            usedPercent: window.usedPercent,
+            usedPercent: usedPercent,
             durationMinutes: window.durationMinutes,
             resetsAt: window.resetsAt?.timeIntervalSince1970
         )
@@ -541,7 +566,7 @@ private final class CodexAppServerClient {
                     "clientInfo": [
                         "name": "codex-usage-app",
                         "title": "Codex Usage App",
-                        "version": "1.7.0"
+                        "version": "1.7.1"
                     ]
                 ]
             ) { result in
@@ -1263,6 +1288,46 @@ private enum CodexUsageMenuBarApp {
                 calendar: utcCalendar
             )
 
+            var resetJitterHistory = UsageHistory()
+            resetJitterHistory.record(
+                weeklyWindow(usedPercent: 20, resetsAt: dailyReset),
+                at: midnight.addingTimeInterval(-120)
+            )
+            resetJitterHistory.record(
+                weeklyWindow(usedPercent: 20, resetsAt: dailyReset + 1),
+                at: midnight.addingTimeInterval(120)
+            )
+            resetJitterHistory.record(
+                weeklyWindow(usedPercent: 26, resetsAt: dailyReset - 1),
+                at: midnight.addingTimeInterval(21_600)
+            )
+            let usageAcrossResetJitter = resetJitterHistory.usageToday(
+                at: midnight.addingTimeInterval(21_600),
+                calendar: utcCalendar
+            )
+
+            var correctedUsageHistory = UsageHistory()
+            correctedUsageHistory.record(
+                weeklyWindow(usedPercent: 40, resetsAt: dailyReset),
+                at: midnight.addingTimeInterval(43_200)
+            )
+            correctedUsageHistory.record(
+                weeklyWindow(usedPercent: 44, resetsAt: dailyReset + 2),
+                at: midnight.addingTimeInterval(45_000)
+            )
+            correctedUsageHistory.record(
+                weeklyWindow(usedPercent: 43, resetsAt: dailyReset + 1),
+                at: midnight.addingTimeInterval(45_120)
+            )
+            correctedUsageHistory.record(
+                weeklyWindow(usedPercent: 46, resetsAt: dailyReset),
+                at: midnight.addingTimeInterval(46_800)
+            )
+            let usageAcrossMinorCorrection = correctedUsageHistory.partialUsageToday(
+                at: midnight.addingTimeInterval(46_800),
+                calendar: utcCalendar
+            )
+
             var unknownResetHistory = UsageHistory()
             unknownResetHistory.record(
                 weeklyWindowWithoutReset(usedPercent: 90),
@@ -1400,6 +1465,8 @@ private enum CodexUsageMenuBarApp {
                   dailyAcrossUnobservedReset == nil,
                   dailyAcrossUnobservedResetPartial == 7,
                   correctedResetPartial == 4,
+                  usageAcrossResetJitter == 6,
+                  usageAcrossMinorCorrection == 6,
                   dailyUnknownReset == nil,
                   dailyUnknownResetInitialPartial == 0,
                   dailyUnknownResetLaterPartial == 1,
